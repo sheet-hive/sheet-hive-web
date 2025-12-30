@@ -9,6 +9,7 @@ import SheetMappingEditor from "@/components/sheet/SheetMappingEditor";
 import AlertDialog from "@/components/common/AlertDialog";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import ValidationTab from "@/components/sheet/validation/ValidationTab";
+import SheetManagementTab from "@/components/sheet/management/SheetManagementTab";
 import { formatTransformError, getTransformSummary } from "@/lib/dataTransform";
 import { useSheetDataPageLogic } from "@/hooks/useSheetDataPageLogic";
 
@@ -106,6 +107,16 @@ export default function SheetDataPage({ params }: PageProps) {
                 }`}
               >
                 データ変換
+              </button>
+              <button
+                onClick={() => logic.requestTabChange("management")}
+                className={`px-4 py-2 font-semibold transition-colors ${
+                  logic.activeTab === "management"
+                    ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                    : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+                }`}
+              >
+                管理
               </button>
             </div>
 
@@ -220,6 +231,18 @@ export default function SheetDataPage({ params }: PageProps) {
               sheetData={logic.sheetData}
               loading={logic.loading}
               mapping={logic.mapping}
+            />
+          ) : logic.activeTab === "management" ? (
+            <SheetManagementTab
+              user={logic.user}
+              projectId={projectId}
+              folderId={folderId}
+              sheetId={sheetId}
+              selectedSheet={logic.selectedSheet}
+              sheetData={logic.sheetData}
+              loading={logic.loading}
+              mapping={logic.mapping}
+              onSaveMapping={logic.handleSaveMapping}
             />
           ) : (
             <div className="space-y-6">

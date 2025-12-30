@@ -24,7 +24,7 @@ import type { SheetMapping } from "@/models/mapping";
 import type { TransformedDataMeta } from "@/models/transformedData";
 import type { SyncLog } from "@/models/syncLog";
 
-export type SheetDataPageTab = "data" | "mapping" | "validation" | "transform";
+export type SheetDataPageTab = "data" | "mapping" | "validation" | "management" | "transform";
 
 export type SheetDataPageTransformResult = {
   success: boolean;
@@ -59,7 +59,7 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
   const { projectId, folderId, sheetId } = input;
   const router = useRouter();
 
-  const sheetMappingRepo = useMemo(() => createFirestoreSheetMappingRepo(db), [db]);
+  const sheetMappingRepo = useMemo(() => createFirestoreSheetMappingRepo(db), []);
 
   const [user, setUser] = useState<User | null>(null);
   const [sheetData, setSheetData] = useState<SheetData | null>(null);
