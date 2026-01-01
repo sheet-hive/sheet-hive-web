@@ -94,6 +94,14 @@ export function useSheetMappingEditorLogic(input: {
     setHasChanges(true);
   };
 
+  const handleKeyColumnChange = (newColIndex: number) => {
+    setMapping((prev) => {
+      if (!prev) return prev;
+      return { ...prev, keyColumnIndex: newColIndex };
+    });
+    setHasChanges(true);
+  };
+
   const handleSave = async () => {
     if (!mapping) return;
     setIsSaving(true);
@@ -117,6 +125,7 @@ export function useSheetMappingEditorLogic(input: {
     handleDataTypeChange,
     handleRemoveMapping,
     handleHeaderRowChange,
+    handleKeyColumnChange,
     handleSave,
   };
 }

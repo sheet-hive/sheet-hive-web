@@ -24,15 +24,15 @@ const dataTypeLabels: Record<DataType, string> = {
 };
 
 const dataTypeColors: Record<DataType, string> = {
-  string: "bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100",
+  string: "bg-orange-100 dark:bg-orange-700 text-orange-800 dark:text-orange-100",
   integer: "bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100",
   decimal: "bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100",
   date: "bg-purple-100 dark:bg-purple-800 text-purple-800 dark:text-purple-100",
   time: "bg-sky-100 dark:bg-sky-800 text-sky-800 dark:text-sky-100",
   datetime: "bg-indigo-100 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-100",
   boolean: "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100",
-  phone: "bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100",
-  unknown: "bg-orange-100 dark:bg-orange-800 text-orange-800 dark:text-orange-100",
+  phone: "bg-yellow-100 dark:bg-yellow-700 text-yellow-800 dark:text-yellow-100",
+  unknown: "bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100",
   number: "bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100",
 };
 
@@ -51,6 +51,7 @@ export default function SheetMappingEditor({
     handleDataTypeChange,
     handleRemoveMapping,
     handleHeaderRowChange,
+    handleKeyColumnChange,
     handleSave,
   } = useSheetMappingEditorLogic({
     sheetData,
@@ -95,7 +96,7 @@ export default function SheetMappingEditor({
       {/* 基本設定 */}
       <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
         <h3 className="font-semibold mb-3">基本設定</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-neutral-600 dark:text-neutral-400 mb-1">
               ヘッダ行
@@ -119,6 +120,23 @@ export default function SheetMappingEditor({
             <div className="px-3 py-2 bg-neutral-100 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded">
               {mapping.dataStartRowIndex + 1}行目
             </div>
+          </div>
+          <div>
+            <label className="block text-sm text-neutral-600 dark:text-neutral-400 mb-1">キー列</label>
+            <select
+              value={String(mapping.keyColumnIndex ?? 0)}
+              onChange={(e) => handleKeyColumnChange(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded"
+            >
+              {mapping.fields
+                .slice()
+                .sort((a, b) => a.columnIndex - b.columnIndex)
+                .map((f) => (
+                  <option key={f.columnIndex} value={String(f.columnIndex)}>
+                    {f.columnIndex + 1}: {f.columnName}
+                  </option>
+                ))}
+            </select>
           </div>
         </div>
       </div>
