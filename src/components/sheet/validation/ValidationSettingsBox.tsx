@@ -1295,7 +1295,7 @@ export default function ValidationSettingsBox(props: Props) {
                           {b.pattern === "numberRelation" ? (
                             <div className="mt-3">
                               <SelectField
-                                label="（条件カラムの数値）"
+                                label="（基準カラムの数値）"
                                 value={(b.compareOp ?? "gt") === "eq" ? "gt" : (b.compareOp ?? "gt")}
                                 onChange={(v) => {
                                   setLogicRuleBlocks((prev) =>
@@ -1318,7 +1318,7 @@ export default function ValidationSettingsBox(props: Props) {
                           ) : b.pattern === "dateRelation" ? (
                             <div className="mt-3">
                               <SelectField
-                                label="（条件カラムの日付）"
+                                label="（基準カラムの日付）"
                                 value={(b.compareOp ?? "after") as DateRelationOp}
                                 onChange={(v) => {
                                   setLogicRuleBlocks((prev) =>
@@ -1341,7 +1341,7 @@ export default function ValidationSettingsBox(props: Props) {
                           ) : b.pattern === "timeRelation" ? (
                             <div className="mt-3">
                               <SelectField
-                                label="（条件カラムの時刻）"
+                                label="（基準カラムの時刻）"
                                 value={(b.compareOp ?? "after") as TimeRelationOp}
                                 onChange={(v) => {
                                   setLogicRuleBlocks((prev) =>
