@@ -896,44 +896,29 @@ export default function ValidationSettingsBox(props: Props) {
 
   // NOTE: 論理整合性はローカル state を持つため、spec 変化に追従する同期が必要。
 
-  const headerButtons = useMemo(() => {
-    if (headerKeys.length === 0) {
-      return <div className="text-sm text-neutral-500 dark:text-neutral-400">(列が見つかりません)</div>;
-    }
-
-    return (
-      <div className="max-w-full overflow-x-auto">
-        <div className="flex gap-2 flex-nowrap pb-1">
-          {headerKeys.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setSelectedColKey(k)}
-              className={`px-3 py-1 rounded text-sm border transition-colors whitespace-nowrap ${
-                selectedColKey === k
-                  ? "text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 bg-white dark:bg-neutral-900"
-                  : "text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              }`}
-            >
-              {k === GLOBAL_COL_KEY ? "全体" : k}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }, [headerKeys, selectedColKey, setSelectedColKey]);
-
   return (
-    <div className="mb-4 p-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded">
-      <div className="mb-3">
-        <div className="text-sm font-semibold mb-2">カラム</div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-sm text-neutral-700 dark:text-neutral-300">列:</label>
-          {headerButtons}
-        </div>
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <SettingsBox title="カラム">
+        {headerKeys.length === 0 ? (
+          <div className="text-sm text-neutral-500 dark:text-neutral-400">(列が見つかりません)</div>
+        ) : (
+          <SelectField
+            label="対象"
+            value={selectedColKey}
+            onChange={setSelectedColKey}
+            disabled={loading}
+          >
+            {headerKeys.map((k) => (
+              <option key={k} value={k}>
+                {k === GLOBAL_COL_KEY ? "全体" : k}
+              </option>
+            ))}
+          </SelectField>
+        )}
+      </SettingsBox>
 
-      <SettingsBox title="設定">
+      <div className="md:col-span-2">
+        <SettingsBox title="設定">
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm text-neutral-700 dark:text-neutral-300">カラム名</div>
@@ -1728,7 +1713,8 @@ export default function ValidationSettingsBox(props: Props) {
             />
           )}
         </div>
-      </SettingsBox>
+        </SettingsBox>
+      </div>
     </div>
   );
 }

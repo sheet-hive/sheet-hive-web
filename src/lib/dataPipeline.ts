@@ -7,7 +7,7 @@ import { TransformedDataMeta, TransformedDataRecord } from "@/models/transformed
 import { fetchSheetData } from "@/lib/sheets";
 import { executeDataPipelineCore, type DataPipelineResult } from "@shared/pipeline";
 import type { TransformResult } from "@shared/mapping";
-import { createFirestoreTransformedDataRepo } from "@/lib/repos";
+import { createFirestoreTransformedDataRepo, createFirestoreValidationSpecRepo } from "@/lib/repos";
 import type { TransformedDataRepoKey } from "@shared/repos";
 
 /**
@@ -43,6 +43,19 @@ export async function executeDataPipeline(
 ): Promise<PipelineResult> {
   const transformedDataRepo = createFirestoreTransformedDataRepo(db);
 
+  // specの日時フォーマット等を変換に反映する（取得できない場合は従来通り）
+  let validationSpec: import("@shared/mapping").ValidationSpec | undefined;
+  try {
+    const validationSpecRepo = createFirestoreValidationSpecRepo(db);
+    const spec = await validationSpecRepo.get({
+      key: { userId, projectId, folderId, sheetId },
+      specId: sheetName || "default",
+    });
+    if (spec) validationSpec = spec;
+  } catch (e) {
+    console.warn("Failed to load validation spec for transform; continue without spec:", e);
+  }
+
   const result: DataPipelineResult = await executeDataPipelineCore(
     {
       now: () => Timestamp.now(),
@@ -56,6 +69,7 @@ export async function executeDataPipeline(
       sheetId,
       sheetName,
       mapping,
+      validationSpec,
     }
   );
 

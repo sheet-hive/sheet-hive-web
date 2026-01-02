@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Loading from "@/components/layout/Loading";
 import type { User } from "firebase/auth";
 
 import { db } from "@/lib/firebase";
@@ -43,12 +44,14 @@ export default function SheetManagementTab(props: Props) {
 
   const [currentSpec, setCurrentSpec] = useState<ValidationSpec | null>(null);
   const [loadingSpec, setLoadingSpec] = useState(false);
+  const [hasLoadedSpec, setHasLoadedSpec] = useState(false);
 
   const [templateName, setTemplateName] = useState("");
   const [templates, setTemplates] = useState<
     Array<{ templateId: string; name: string; spec: ValidationSpec; mapping?: SheetMapping; headerKeys: string[] }>
   >([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [hasLoadedTemplates, setHasLoadedTemplates] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const headerRowIndex = useMemo(() => {
@@ -93,6 +96,7 @@ export default function SheetManagementTab(props: Props) {
       setCurrentSpec(null);
     } finally {
       setLoadingSpec(false);
+      setHasLoadedSpec(true);
     }
   }, [folderId, projectId, selectedSheet, sheetId, user, validationSpecRepo]);
 
@@ -134,6 +138,7 @@ export default function SheetManagementTab(props: Props) {
       setTemplates([]);
     } finally {
       setLoadingTemplates(false);
+      setHasLoadedTemplates(true);
     }
   }, [currentHeaderKeyByNormalized, user, validationSpecTemplateRepo]);
 
@@ -430,13 +435,13 @@ export default function SheetManagementTab(props: Props) {
                 </button>
               </div>
 
-              {!mapping && (
+              {!mapping && hasLoadedSpec && hasLoadedTemplates && !loading && !loadingSpec && !loadingTemplates && (
                 <div className="mt-2 text-xs text-orange-600 dark:text-orange-400">
                   ⚠️ テンプレートの保存にはマッピング設定が必要です。
                 </div>
               )}
 
-              {!currentSpec && !loadingSpec && (
+              {!currentSpec && hasLoadedSpec && !loadingSpec && (
                 <div className="mt-2 text-xs text-orange-600 dark:text-orange-400">
                   ⚠️ テンプレートの保存には、バリデーション設定（保存済み）が必要です。
                 </div>
@@ -483,7 +488,7 @@ export default function SheetManagementTab(props: Props) {
                 <div className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{selectedTemplateMatchText}</div>
               )}
 
-              {!mapping && (
+              {!mapping && hasLoadedSpec && hasLoadedTemplates && !loading && !loadingSpec && !loadingTemplates && (
                 <div className="mt-2 text-xs text-orange-600 dark:text-orange-400">
                   ⚠️ テンプレ適用にはマッピング設定が必要です。
                 </div>
@@ -491,9 +496,9 @@ export default function SheetManagementTab(props: Props) {
             </div>
           </div>
 
-          {(loadingSpec || loadingTemplates) && (
-            <div className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-              読み込み中...
+          {(loadingSpec || loadingTemplates || (user && (!hasLoadedSpec || !hasLoadedTemplates))) && (
+            <div className="mt-2">
+              <Loading message="テンプレートを読み込み中..." />
             </div>
           )}
 

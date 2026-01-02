@@ -1,5 +1,5 @@
 "use client";
-import { use } from "react";
+import { use, useMemo } from "react";
 import DataGrid from "@/components/sheet/DataGrid";
 import Sidebar from "@/components/layout/Sidebar";
 import Breadcrumb from "@/components/layout/Breadcrumb";
@@ -26,6 +26,146 @@ export default function SheetDataPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const { projectId, folderId, sheetId } = resolvedParams;
   const logic = useSheetDataPageLogic({ projectId, folderId, sheetId });
+
+  const escapeCsvCell = (v: string): string => {
+    const s = (v ?? "").toString();
+    if (/[^\S\r\n]*[\r\n",]/.test(s) || /[\r\n",]/.test(s)) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const toCsvText = (rows: string[][]): string => {
+    return rows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(",")).join("\r\n");
+  };
+
+  const downloadTextAsFile = (fileName: string, content: string, mimeType: string): void => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTransformedCsv = (): void => {
+    const mapping = logic.mapping;
+    const rawValues = logic.sheetData?.values;
+    const transform = logic.transformResult?.transformResult;
+
+    if (!mapping || !rawValues || !transform) return;
+    const transformedRows = transform.data ?? [];
+
+    const headerRowIndex = mapping.headerRowIndex ?? 0;
+    const dataStartRowIndex = mapping.dataStartRowIndex ?? headerRowIndex + 1;
+
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    const formatDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const formatDateTime = (d: Date) =>
+      `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    const formatTime = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+
+    const formatAfter = (value: unknown, dataType: string): string => {
+      if (value == null) return "";
+      if (value instanceof Date) {
+        if (dataType === "date") return formatDate(value);
+        if (dataType === "datetime") return formatDateTime(value);
+        if (dataType === "time") return formatTime(value);
+        return value.toISOString();
+      }
+      return String(value);
+    };
+
+    const headerRow = rawValues[headerRowIndex] ?? [];
+    const rows: string[][] = [headerRow.map((v) => (v ?? "").toString())];
+
+    for (let i = 0; i < transformedRows.length; i++) {
+      const rawRow = rawValues[dataStartRowIndex + i] ?? [];
+      const outRow = (transformedRows[i] ?? {}) as Record<string, unknown>;
+
+      const nextRow = rawRow.map((v) => (v ?? "").toString());
+
+      for (const f of mapping.fields ?? []) {
+        const colIndex = f.columnIndex;
+        if (colIndex < 0) continue;
+
+        const after = formatAfter(outRow[f.fieldName], (f.dataType ?? "") as string);
+        while (nextRow.length <= colIndex) nextRow.push("");
+        nextRow[colIndex] = after;
+      }
+
+      rows.push(nextRow);
+    }
+
+    const baseNameRaw = (logic.selectedSheet || sheetId || "sheet").toString();
+    const baseName = baseNameRaw.toLowerCase().endsWith(".csv") ? baseNameRaw.slice(0, -4) : baseNameRaw;
+    const text = toCsvText(rows);
+    downloadTextAsFile(`${baseName}_transformed.csv`, text, "text/csv;charset=utf-8");
+  };
+
+  const transformDiffPreview = useMemo(() => {
+    const MAX_DIFF_PREVIEW = 200;
+
+    const mapping = logic.mapping;
+    const rawValues = logic.sheetData?.values;
+    const transform = logic.transformResult?.transformResult;
+
+    if (!mapping || !rawValues || !transform) {
+      return { diffs: [] as Array<{ row: number; field: string; before: string; after: string }>, scannedRows: 0 };
+    }
+
+    const dataStartRowIndex = mapping.dataStartRowIndex ?? (mapping.headerRowIndex ?? 0) + 1;
+    const transformedRows = transform.data ?? [];
+
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    const formatDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const formatDateTime = (d: Date) =>
+      `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+
+    const formatAfter = (value: unknown, dataType: string): string => {
+      if (value == null) return "";
+      if (value instanceof Date) {
+        if (dataType === "date") return formatDate(value);
+        if (dataType === "datetime") return formatDateTime(value);
+        return value.toISOString();
+      }
+      return String(value);
+    };
+
+    const diffs: Array<{ row: number; field: string; before: string; after: string }> = [];
+
+    for (let i = 0; i < transformedRows.length; i++) {
+      if (diffs.length >= MAX_DIFF_PREVIEW) break;
+
+      const rawRow = rawValues[dataStartRowIndex + i] ?? [];
+      const outRow = (transformedRows[i] ?? {}) as Record<string, unknown>;
+
+      for (const f of mapping.fields ?? []) {
+        if (diffs.length >= MAX_DIFF_PREVIEW) break;
+
+        const before = (rawRow[f.columnIndex] ?? "").toString();
+        const after = formatAfter(outRow[f.fieldName], (f.dataType ?? "") as string);
+
+        if (before === after) continue;
+        if (before.trim() === "" && after === "") continue;
+
+        diffs.push({
+          row: dataStartRowIndex + i + 1,
+          field: f.fieldName,
+          before,
+          after,
+        });
+      }
+    }
+
+    return { diffs, scannedRows: transformedRows.length };
+  }, [logic.mapping, logic.sheetData?.values, logic.transformResult?.transformResult]);
 
   if (logic.isInitialLoading) {
     return <Loading fullScreen message="シートを読み込んでいます..." />;
@@ -249,10 +389,10 @@ export default function SheetDataPage({ params }: PageProps) {
               {/* 変換実行セクション */}
               <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <h2 className="text-lg font-semibold mb-3 text-blue-800 dark:text-blue-200">
-                  データ変換・保存
+                  データ変換
                 </h2>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-                  マッピング定義に基づいてデータを変換し、Firestoreに保存します
+                  マッピング＋バリデーション設定に基づいてデータを変換します。
                 </p>
                 <button
                   onClick={logic.handleTransformData}
@@ -278,6 +418,17 @@ export default function SheetDataPage({ params }: PageProps) {
                   <h2 className="text-lg font-semibold mb-3">変換結果</h2>
                   <div className="text-lg mb-4">
                     {getTransformSummary(logic.transformResult.transformResult)}
+                  </div>
+
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!logic.mapping || !logic.sheetData?.values || !logic.transformResult?.transformResult}
+                      onClick={handleDownloadTransformedCsv}
+                    >
+                      変換後 CSV ダウンロード
+                    </button>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -318,6 +469,40 @@ export default function SheetDataPage({ params }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  <div className="mt-4 p-4 bg-white/60 dark:bg-neutral-900/40 rounded border border-neutral-200 dark:border-neutral-700">
+                    <h3 className="font-semibold mb-2">変換差分（プレビュー）</h3>
+                    <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-3">
+                      変換前（元シート）と変換後（保存データ）の差分を、先頭200件まで表示します。
+                    </div>
+
+                    {transformDiffPreview.diffs.length === 0 ? (
+                      <div className="text-sm text-neutral-600 dark:text-neutral-400">差分はありません</div>
+                    ) : (
+                      <div className="overflow-auto max-h-[420px] border border-neutral-200 dark:border-neutral-700 rounded">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-neutral-50 dark:bg-neutral-950 sticky top-0">
+                            <tr>
+                              <th className="text-left font-semibold px-2 py-2 border-b border-neutral-200 dark:border-neutral-800 whitespace-nowrap">行</th>
+                              <th className="text-left font-semibold px-2 py-2 border-b border-neutral-200 dark:border-neutral-800 whitespace-nowrap">フィールド</th>
+                              <th className="text-left font-semibold px-2 py-2 border-b border-neutral-200 dark:border-neutral-800">変換前</th>
+                              <th className="text-left font-semibold px-2 py-2 border-b border-neutral-200 dark:border-neutral-800">変換後</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {transformDiffPreview.diffs.map((d, idx) => (
+                              <tr key={idx} className="odd:bg-white even:bg-neutral-50 dark:odd:bg-neutral-900 dark:even:bg-neutral-950">
+                                <td className="px-2 py-1 border-b border-neutral-100 dark:border-neutral-800 whitespace-nowrap">{d.row}</td>
+                                <td className="px-2 py-1 border-b border-neutral-100 dark:border-neutral-800 whitespace-nowrap">{d.field}</td>
+                                <td className="px-2 py-1 border-b border-neutral-100 dark:border-neutral-800 max-w-[420px] truncate" title={d.before}>{d.before || "(空)"}</td>
+                                <td className="px-2 py-1 border-b border-neutral-100 dark:border-neutral-800 max-w-[420px] truncate" title={d.after}>{d.after || "(空)"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
