@@ -301,7 +301,7 @@ export default function SheetManagementTab(props: Props) {
     if (!user) return;
     const name = templateName.trim();
     if (!name) {
-      alert("テンプレ名を入力してください");
+      alert("テンプレート名を入力してください");
       return;
     }
     if (!schemaSignature) {
