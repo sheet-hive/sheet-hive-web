@@ -1,25 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
-
-// Firebase Admin初期化
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
-
-const db = getFirestore();
-const auth = getAuth();
+import { getFirebaseAdmin, isDemoMode } from "@/lib/server/firebaseAdmin";
 
 // batchGetを使用して複数範囲のデータを一度に取得
 export async function POST(req: NextRequest) {
   try {
+    if (isDemoMode()) {
+      return NextResponse.json(
+        { error: "Not available in demo mode" },
+        { status: 404 }
+      );
+    }
+
+    const admin = getFirebaseAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Firebase Admin is not configured" },
+        { status: 500 }
+      );
+    }
+
+    const { db, auth } = admin;
+
     // Authorization ヘッダーから Firebase ID トークンを取得
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -110,3 +111,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
