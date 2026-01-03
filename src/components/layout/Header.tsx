@@ -2,14 +2,14 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth } from "../../lib/firebase";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
 
 export default function Header() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = subscribeAuthUser((u) => setUser(u));
     return () => unsub();
   }, []);
 
@@ -43,6 +43,11 @@ export default function Header() {
 
         {/* 右端: プロフィールボタン */}
         <div className="flex-shrink-0 flex items-center gap-3">
+          {isDemoMode() && (
+            <div className="text-xs px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200">
+              Demo Mode
+            </div>
+          )}
           <div className="text-sm text-gray-700 dark:text-gray-200">{user ? user.displayName : ""}</div>
           <Link href="/profile" className="p-2 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-black dark:text-white" aria-label="プロフィールへ">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

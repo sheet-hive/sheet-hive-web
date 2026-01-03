@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { User } from "firebase/auth";
+import type { AppUser } from "@/lib/authState";
 import { Timestamp, doc, setDoc } from "firebase/firestore";
 
 import InfoDialog from "@/components/common/InfoDialog";
 import Loading from "@/components/layout/Loading";
 import ValidationSettingsBox from "@/components/sheet/validation/ValidationSettingsBox";
 import { db } from "@/lib/firebase";
-import { createFirestoreValidationSpecRepo } from "@/lib/repos";
+import { isDemoMode } from "@/lib/appMode";
+import { demoApi } from "@/demo/demoApi";
+import { createValidationSpecRepo } from "@/lib/repos";
 import { buildRuntimeValidationSpec, toRowObjects } from "@/lib/validationRuntime";
 import type { DataType, SheetMapping } from "@/models/mapping";
 import type { SheetData } from "@/lib/sheets";
@@ -93,7 +95,7 @@ const downloadTextAsFile = (fileName: string, content: string, mimeType: string)
 };
 
 type Props = {
-  user: User | null;
+  user: AppUser | null;
   projectId: string;
   folderId: string;
   sheetId: string;
@@ -134,7 +136,7 @@ function formatDataTypeJa(dataType: DataType | null | undefined): string {
 export default function ValidationTab(props: Props) {
   const { user, projectId, folderId, sheetId, selectedSheet, sheetData, loading, mapping } = props;
 
-  const validationSpecRepo = useMemo(() => createFirestoreValidationSpecRepo(db), [db]);
+  const validationSpecRepo = useMemo(() => createValidationSpecRepo(db), [db]);
 
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
@@ -542,7 +544,25 @@ export default function ValidationTab(props: Props) {
       const result = validateSheetData(rowObjects, runtimeSpec);
       setValidationResult(result);
 
-      if (user) {
+      if (isDemoMode()) {
+        // ダッシュボード（チャート/KPI）は Sheet の lastValidation* を参照するため、デモでも保存する
+        try {
+          const sheets = await demoApi.listSheets(projectId, folderId);
+          const current = sheets.find((s) => s.id === sheetId || s.sheetId === sheetId);
+          if (current) {
+            await demoApi.upsertSheet(projectId, folderId, {
+              ...current,
+              lastValidatedAt: Timestamp.now(),
+              lastValidationTotalRows: result.stats.totalRows,
+              lastValidationErrorRows: result.stats.errorRowCount,
+            });
+          }
+        } catch (e) {
+          console.error("Failed to persist demo validation stats:", e);
+        }
+      }
+
+      if (!isDemoMode() && user) {
         try {
           const sheetRef = doc(db, "users", user.uid, "projects", projectId, "folders", folderId, "sheets", sheetId);
           await setDoc(
@@ -724,14 +744,16 @@ export default function ValidationTab(props: Props) {
             />
           )}
 
-          <button
-            onClick={handleValidate}
-            disabled={isValidating || !mapping}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isValidating ? "実行中..." : "バリデーション実行"}
-          </button>
+          <div className="mt-4">
+            <button
+              onClick={handleValidate}
+              disabled={isValidating || !mapping}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isValidating ? "実行中..." : "バリデーション実行"}
+            </button>
           </div>
+        </div>
 
           {validationResult && (
             <div className="p-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg">

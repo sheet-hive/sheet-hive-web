@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 
 import { auth, db } from "@/lib/firebase";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
 import {
   fetchSheetData,
   fetchSheetMetadata,
@@ -16,7 +18,7 @@ import {
 import { inferDataType } from "@/lib/dataMapping";
 import { executeDataPipeline, getLatestTransformedDataMeta, getTransformHistory } from "@/lib/dataPipeline";
 import { executeSyncPipeline, getSyncLogs } from "@/lib/syncPipeline";
-import { createFirestoreSheetMappingRepo } from "@/lib/repos";
+import { createSheetMappingRepo } from "@/lib/repos";
 
 import type { Project } from "@/models/project";
 import type { Folder } from "@/models/folder";
@@ -59,9 +61,9 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
   const { projectId, folderId, sheetId } = input;
   const router = useRouter();
 
-  const sheetMappingRepo = useMemo(() => createFirestoreSheetMappingRepo(db), []);
+  const sheetMappingRepo = useMemo(() => createSheetMappingRepo(db), []);
 
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [sheetData, setSheetData] = useState<SheetData | null>(null);
   const [metadata, setMetadata] = useState<SheetMetadata | null>(null);
   const [project, setProject] = useState<Project | null>(null);
@@ -90,6 +92,20 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
   const [showMissingMappingAlert, setShowMissingMappingAlert] = useState(false);
   const [pendingTab, setPendingTab] = useState<SheetDataPageTab | null>(null);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [infoDialogTitle, setInfoDialogTitle] = useState<string | undefined>(undefined);
+  const [infoDialogMessage, setInfoDialogMessage] = useState<string>("");
+
+  const showInfoDialog = useCallback((message: string, title?: string) => {
+    setInfoDialogTitle(title);
+    setInfoDialogMessage(message);
+    setInfoDialogOpen(true);
+  }, []);
+
+  const closeInfoDialog = useCallback(() => {
+    setInfoDialogOpen(false);
+  }, []);
 
   const requestTabChange = useCallback(
     (nextTab: SheetDataPageTab) => {
@@ -133,11 +149,10 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
   }, [mappingDirty]);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    return subscribeAuthUser((u) => {
       setUser(u);
       if (!u) router.replace("/login");
     });
-    return () => unsub();
   }, [router]);
 
   useEffect(() => {
@@ -145,17 +160,21 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
 
     const loadProjectAndFolder = async () => {
       try {
+        if (isDemoMode()) {
+          const [p, f] = await Promise.all([demoApi.getProject(projectId), demoApi.getFolder(projectId, folderId)]);
+          setProject(p);
+          setFolder(f);
+          return;
+        }
+
+        const { doc, getDoc } = await import("firebase/firestore");
         const projectRef = doc(db, "users", user.uid, "projects", projectId);
         const projectSnap = await getDoc(projectRef);
-        if (projectSnap.exists()) {
-          setProject({ id: projectSnap.id, ...projectSnap.data() } as Project);
-        }
+        if (projectSnap.exists()) setProject({ id: projectSnap.id, ...projectSnap.data() } as Project);
 
         const folderRef = doc(db, "users", user.uid, "projects", projectId, "folders", folderId);
         const folderSnap = await getDoc(folderRef);
-        if (folderSnap.exists()) {
-          setFolder({ id: folderSnap.id, ...folderSnap.data() } as Folder);
-        }
+        if (folderSnap.exists()) setFolder({ id: folderSnap.id, ...folderSnap.data() } as Folder);
       } catch (err) {
         console.error("Failed to load project/folder:", err);
       }
@@ -197,7 +216,7 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
         setSheetData(data);
       } catch (err) {
         console.error("Failed to load sheet data:", err);
-        if (err instanceof Error && isTokenExpiredError(err)) {
+        if (!isDemoMode() && err instanceof Error && isTokenExpiredError(err)) {
           await signOut(auth);
           router.replace("/login");
         } else {
@@ -370,7 +389,7 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
 
   const handleTransformData = useCallback(async () => {
     if (!user || !mapping) {
-      alert("マッピング定義が必要です");
+      showInfoDialog("マッピング定義が必要です。", "確認");
       return;
     }
 
@@ -390,25 +409,25 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
       setTransformResult(result);
 
       if (result.success) {
-        alert("データ変換・保存が完了しました");
+        showInfoDialog("データ変換・保存が完了しました。", "完了");
         loadLatestTransform();
         loadTransformHistory();
       } else {
-        alert(`データ変換でエラーが発生しました: ${result.errorMessage || "不明なエラー"}`);
+        showInfoDialog(`データ変換でエラーが発生しました: ${result.errorMessage || "不明なエラー"}`, "エラー");
       }
     } catch (error) {
       console.error("Transform failed:", error);
-      alert("データ変換に失敗しました");
+      showInfoDialog("データ変換に失敗しました。", "エラー");
     } finally {
       setIsTransforming(false);
     }
-  }, [user, mapping, projectId, folderId, sheetId, selectedSheet, loadLatestTransform, loadTransformHistory]);
+  }, [user, mapping, projectId, folderId, sheetId, selectedSheet, loadLatestTransform, loadTransformHistory, showInfoDialog]);
 
   const handleSync = useCallback(async () => {
     if (!user || syncing) return;
 
     if (!mapping) {
-      alert("マッピング定義が必要です。先に「マッピング設定」タブでマッピングを設定してください。");
+      showInfoDialog("マッピング定義が必要です。先に「マッピング設定」タブでマッピングを設定してください。", "確認");
       return;
     }
 
@@ -430,7 +449,10 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
         if (merged.addedCount > 0) parts.push(`追加: ${merged.addedCount}件`);
         if (merged.removedCount > 0) parts.push(`削除: ${merged.removedCount}件`);
         if (merged.updatedIndexCount > 0) parts.push(`列位置更新: ${merged.updatedIndexCount}件`);
-        alert(`シートのカラム差分をマッピング設定に反映しました（${parts.join(" / ")}）。内容を確認して「保存」してください。`);
+        showInfoDialog(
+          `シートのカラム差分をマッピング設定に反映しました（${parts.join(" / ")}）。\n内容を確認して「保存」してください。`,
+          "マッピング更新"
+        );
         return;
       }
 
@@ -450,19 +472,19 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
         loadLatestTransform();
         loadTransformHistory();
 
-        alert(`同期が完了しました（成功: ${result.recordsSuccess}/${result.recordsProcessed}件）`);
+        showInfoDialog(`同期が完了しました（成功: ${result.recordsSuccess}/${result.recordsProcessed}件）`, "完了");
       } else {
-        alert(`同期でエラーが発生しました: ${result.errorMessage || "不明なエラー"}`);
+        showInfoDialog(`同期でエラーが発生しました: ${result.errorMessage || "不明なエラー"}`, "エラー");
       }
     } catch (err) {
       console.error("Sync failed:", err);
       const errorMsg = err instanceof Error ? err.message : "同期に失敗しました";
       setError(errorMsg);
-      alert(errorMsg);
+      showInfoDialog(errorMsg, "エラー");
     } finally {
       setSyncing(false);
     }
-  }, [user, syncing, mapping, range, selectedSheet, sheetId, projectId, folderId, mergeNewColumnsIntoMapping, loadLatestTransform, loadTransformHistory]);
+  }, [user, syncing, mapping, range, selectedSheet, sheetId, projectId, folderId, mergeNewColumnsIntoMapping, loadLatestTransform, loadTransformHistory, showInfoDialog]);
 
   const confirmDialogCancel = useCallback(() => {
     setShowUnsavedMappingDialog(false);
@@ -540,6 +562,10 @@ export function useSheetDataPageLogic(input: { projectId: string; folderId: stri
     showUnsavedMappingDialog,
     showMissingMappingAlert,
     setShowMissingMappingAlert,
+    infoDialogOpen,
+    infoDialogTitle,
+    infoDialogMessage,
+    closeInfoDialog,
     requestNavigate,
     confirmDialogCancel,
     confirmDialogConfirm,

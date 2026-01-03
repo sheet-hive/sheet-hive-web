@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
 import {
   collection,
   doc,
@@ -16,9 +15,13 @@ import {
 import { Member } from "@/models/member";
 import { Project } from "@/models/project";
 import Loading from "@/components/layout/Loading";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
+import { subscribeDemoState } from "@/demo/demoStore";
 
 export default function ProjectMembers({ projectId }: { projectId: string }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [loadingProject, setLoadingProject] = useState(true);
@@ -30,12 +33,26 @@ export default function ProjectMembers({ projectId }: { projectId: string }) {
   const [inviteRole, setInviteRole] = useState("member");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = subscribeAuthUser((u) => setUser(u));
     return () => unsub();
   }, []);
 
   useEffect(() => {
     if (!user || !user.uid || !projectId || typeof projectId !== "string") return;
+
+    if (isDemoMode()) {
+      const load = async () => {
+        const p = await demoApi.getProject(projectId);
+        const list = await demoApi.listMembers(projectId);
+        setProject(p);
+        setMembers(list);
+        setLoadingProject(false);
+        setLoadingMembers(false);
+      };
+      void load();
+      const unsub = subscribeDemoState(() => void load());
+      return () => unsub();
+    }
 
     let unsubProj: (() => void) | null = null;
     let unsubMembers: (() => void) | null = null;
@@ -86,6 +103,7 @@ export default function ProjectMembers({ projectId }: { projectId: string }) {
     e?.preventDefault();
     if (!user) return alert("ログインしてください");
     if (!canManage()) return alert("権限がありません");
+    if (isDemoMode()) return alert("Demo Modeでは招待は無効です");
     const value = inviteInput.trim();
     if (!value) return;
     try {
@@ -118,6 +136,7 @@ export default function ProjectMembers({ projectId }: { projectId: string }) {
   const changeRole = async (m: Member, newRole: string) => {
     if (!user || !m.id) return;
     if (!canManage()) return alert("権限がありません");
+    if (isDemoMode()) return alert("Demo Modeではロール変更は無効です");
     try {
       await setDoc(doc(db, "users", user.uid, "projects", projectId, "members", m.id), { role: newRole }, { merge: true });
     } catch (err) {
@@ -129,6 +148,7 @@ export default function ProjectMembers({ projectId }: { projectId: string }) {
   const removeMember = async (m: Member) => {
     if (!user || !m.id) return;
     if (!canManage()) return alert("権限がありません");
+    if (isDemoMode()) return alert("Demo Modeでは削除は無効です");
     if (!confirm("メンバーを削除しますか？")) return;
     try {
       await deleteDoc(doc(db, "users", user.uid, "projects", projectId, "members", m.id));
@@ -151,7 +171,7 @@ export default function ProjectMembers({ projectId }: { projectId: string }) {
             <option value="member">member</option>
             <option value="admin">admin</option>
           </select>
-          <button disabled={!canManage()} className="px-3 py-2 bg-black text-white rounded">招待</button>
+          <button disabled={!canManage() || isDemoMode()} className="px-3 py-2 bg-black text-white rounded">招待</button>
         </form>
       </div>
 

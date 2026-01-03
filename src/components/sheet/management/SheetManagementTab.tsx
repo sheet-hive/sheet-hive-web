@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Loading from "@/components/layout/Loading";
-import type { User } from "firebase/auth";
+import InfoDialog from "@/components/common/InfoDialog";
+import type { AppUser } from "@/lib/authState";
 
 import { db } from "@/lib/firebase";
 import {
-  createFirestoreSheetMappingRepo,
-  createFirestoreValidationSpecRepo,
-  createFirestoreValidationSpecTemplateRepo,
+  createSheetMappingRepo,
+  createValidationSpecRepo,
+  createValidationSpecTemplateRepo,
 } from "@/lib/repos";
 import type { SheetData } from "@/lib/sheets";
 import type { SheetMapping } from "@/models/mapping";
@@ -19,7 +20,7 @@ import {
 } from "@shared/mapping";
 
 type Props = {
-  user: User | null;
+  user: AppUser | null;
   projectId: string;
   folderId: string;
   sheetId: string;
@@ -34,9 +35,9 @@ type Props = {
 export default function SheetManagementTab(props: Props) {
   const { user, projectId, folderId, sheetId, selectedSheet, sheetData, loading, mapping, onSaveMapping } = props;
 
-  const validationSpecRepo = useMemo(() => createFirestoreValidationSpecRepo(db), []);
-  const validationSpecTemplateRepo = useMemo(() => createFirestoreValidationSpecTemplateRepo(db), []);
-  const sheetMappingRepo = useMemo(() => createFirestoreSheetMappingRepo(db), []);
+  const validationSpecRepo = useMemo(() => createValidationSpecRepo(db), []);
+  const validationSpecTemplateRepo = useMemo(() => createValidationSpecTemplateRepo(db), []);
+  const sheetMappingRepo = useMemo(() => createSheetMappingRepo(db), []);
 
   const isRecord = useCallback((v: unknown): v is Record<string, unknown> => {
     return typeof v === "object" && v !== null;
@@ -53,6 +54,20 @@ export default function SheetManagementTab(props: Props) {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [hasLoadedTemplates, setHasLoadedTemplates] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [infoDialogTitle, setInfoDialogTitle] = useState("");
+  const [infoDialogMessage, setInfoDialogMessage] = useState("");
+
+  const openInfoDialog = useCallback((title: string, message: string) => {
+    setInfoDialogTitle(title);
+    setInfoDialogMessage(message);
+    setInfoDialogOpen(true);
+  }, []);
+
+  const closeInfoDialog = useCallback(() => {
+    setInfoDialogOpen(false);
+  }, []);
 
   const headerRowIndex = useMemo(() => {
     return currentSpec?.options?.headerRowIndex ?? mapping?.headerRowIndex ?? 0;
@@ -306,21 +321,21 @@ export default function SheetManagementTab(props: Props) {
     if (!user) return;
     const name = templateName.trim();
     if (!name) {
-      alert("テンプレート名を入力してください");
+      openInfoDialog("テンプレート保存", "テンプレート名を入力してください");
       return;
     }
     if (!schemaSignature) {
-      alert("ヘッダ（カラム構成）が取得できません");
+      openInfoDialog("テンプレート保存", "ヘッダ（カラム構成）が取得できません");
       return;
     }
 
     if (!mapping) {
-      alert("テンプレ保存にはマッピングが必要です（先にマッピングを作成してください）");
+      openInfoDialog("テンプレート保存", "テンプレ保存にはマッピングが必要です（先にマッピングを作成してください）");
       return;
     }
 
     if (!currentSpec) {
-      alert("テンプレ保存にはバリデーション設定（保存済み）が必要です");
+      openInfoDialog("テンプレート保存", "テンプレ保存にはバリデーション設定（保存済み）が必要です");
       return;
     }
 
@@ -335,11 +350,12 @@ export default function SheetManagementTab(props: Props) {
       });
       setTemplateName("");
       await loadTemplates();
+      openInfoDialog("テンプレート保存", "テンプレートを保存しました");
     } catch (e) {
       console.error("Failed to save template:", e);
-      alert("テンプレ保存に失敗しました");
+      openInfoDialog("テンプレート保存", "テンプレ保存に失敗しました");
     }
-  }, [currentSpec, loadTemplates, mapping, schemaSignature, sheetHeaderKeys, templateName, user, validationSpecTemplateRepo]);
+  }, [currentSpec, loadTemplates, mapping, openInfoDialog, schemaSignature, sheetHeaderKeys, templateName, user, validationSpecTemplateRepo]);
 
   const handleApplyTemplate = useCallback(async () => {
     if (!selectedTemplateId) return;
@@ -366,15 +382,16 @@ export default function SheetManagementTab(props: Props) {
         }
       }
 
-      alert("テンプレを適用して保存しました");
+      openInfoDialog("テンプレート読み込み", "テンプレートを適用して保存しました");
     } catch (e) {
       console.error("Failed to apply template:", e);
-      alert("テンプレ適用（保存）に失敗しました");
+      openInfoDialog("テンプレート読み込み", "テンプレ適用（保存）に失敗しました");
     }
   }, [
     folderId,
     loadCurrentSpec,
     onSaveMapping,
+    openInfoDialog,
     projectId,
     projectTemplateMappingToCurrentHeader,
     projectTemplateSpecToCurrentHeader,
@@ -399,6 +416,13 @@ export default function SheetManagementTab(props: Props) {
 
   return (
     <div className="space-y-6">
+      <InfoDialog
+        open={infoDialogOpen}
+        title={infoDialogTitle}
+        message={infoDialogMessage}
+        onClose={closeInfoDialog}
+      />
+
       <div className="p-6 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
         <h2 className="text-lg font-semibold mb-3">管理</h2>
         <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
@@ -429,7 +453,7 @@ export default function SheetManagementTab(props: Props) {
                 <button
                   className="px-3 py-1 text-sm rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 disabled:opacity-50"
                   onClick={() => void handleSaveTemplate()}
-                  disabled={!user || loadingTemplates || loadingSpec || loading}
+                  disabled={!user || !templateName.trim() || loadingTemplates || loadingSpec || loading}
                 >
                   保存
                 </button>

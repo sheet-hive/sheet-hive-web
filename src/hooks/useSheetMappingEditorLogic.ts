@@ -15,8 +15,9 @@ export function useSheetMappingEditorLogic(input: {
   initialHasChanges?: boolean;
   onSave: (mapping: SheetMapping) => Promise<void>;
   onHasChangesChange?: (hasChanges: boolean) => void;
+  onNotify?: (title: string, message: string) => void;
 }) {
-  const { sheetData, initialMapping, initialHasChanges, onSave, onHasChangesChange } = input;
+  const { sheetData, initialMapping, initialHasChanges, onSave, onHasChangesChange, onNotify } = input;
 
   const [mapping, setMapping] = useState<SheetMapping | null>(() =>
     initialMapping ? cloneForEdit(initialMapping) : null
@@ -108,10 +109,12 @@ export function useSheetMappingEditorLogic(input: {
     try {
       await onSave(mapping);
       setHasChanges(false);
-      alert("マッピング設定を保存しました");
+      if (onNotify) onNotify("マッピング保存", "マッピング設定を保存しました");
+      else alert("マッピング設定を保存しました");
     } catch (error) {
       console.error("保存エラー:", error);
-      alert("保存に失敗しました");
+      if (onNotify) onNotify("マッピング保存", "保存に失敗しました");
+      else alert("保存に失敗しました");
     } finally {
       setIsSaving(false);
     }

@@ -8,8 +8,13 @@ import { SheetMapping } from "@/models/mapping";
 import { SyncLog } from "@/models/syncLog";
 import { fetchSheetData } from "@/lib/sheets";
 import { executeSyncPipelineCore, type SyncPipelineResult } from "@shared/pipeline";
-import { createFirestoreSyncLogRepo, createFirestoreTransformedDataRepo } from "@/lib/repos";
+import { createSyncLogRepo, createTransformedDataRepo } from "@/lib/repos";
+import { isDemoMode } from "@/lib/appMode";
 import type { SyncLogRepoKey, TransformedDataRepoKey } from "@shared/repos";
+
+function makeId(prefix: string): string {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 /**
  * 同期パイプラインの実行
@@ -31,11 +36,12 @@ export async function executeSyncPipeline(
   sheetName: string,
   mapping: SheetMapping
 ): Promise<SyncPipelineResult> {
-  const logsPath = `users/${userId}/projects/${projectId}/folders/${folderId}/sheets/${sheetId}/syncLogs`;
-  const syncLogId = doc(collection(db, logsPath)).id;
+  const syncLogId = isDemoMode()
+    ? makeId("sync")
+    : doc(collection(db, `users/${userId}/projects/${projectId}/folders/${folderId}/sheets/${sheetId}/syncLogs`)).id;
 
-  const syncLogRepo = createFirestoreSyncLogRepo(db);
-  const transformedDataRepo = createFirestoreTransformedDataRepo(db);
+  const syncLogRepo = createSyncLogRepo(db);
+  const transformedDataRepo = createTransformedDataRepo(db);
 
   return executeSyncPipelineCore(
     {
@@ -79,7 +85,7 @@ export async function getSyncLogs(
   sheetId: string,
   limitCount: number = 5
 ): Promise<SyncLog[]> {
-  const repo = createFirestoreSyncLogRepo(db);
+  const repo = createSyncLogRepo(db);
   const key = buildRepoKey(userId, projectId, folderId, sheetId);
   const logs = await repo.list?.({ key, limitCount });
   return (logs as unknown as SyncLog[]) ?? [];

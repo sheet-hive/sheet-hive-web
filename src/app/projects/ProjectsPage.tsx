@@ -1,8 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
 import {
   collection,
   onSnapshot,
@@ -12,19 +11,37 @@ import {
 import { Project } from "@/models/project";
 import Sidebar from "@/components/layout/Sidebar";
 import Loading from "@/components/layout/Loading";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
+import { subscribeDemoState } from "@/demo/demoStore";
 
 export default function ProjectsPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = subscribeAuthUser((u) => setUser(u));
     return () => unsub();
   }, []);
 
   useEffect(() => {
     if (!user) return;
+
+    if (isDemoMode()) {
+      const load = async () => {
+        const list = await demoApi.listProjects();
+        setProjects(list);
+        setLoading(false);
+      };
+      void load();
+      const unsub = subscribeDemoState(() => {
+        void load();
+      });
+      return () => unsub();
+    }
+
     const col = collection(db, "users", user.uid, "projects");
     const q = query(col, orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {

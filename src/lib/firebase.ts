@@ -1,7 +1,11 @@
 // src/lib/firebase.ts
 import { initializeApp, getApps } from 'firebase/app';
+import type { Auth } from 'firebase/auth';
 import { getAuth } from 'firebase/auth';
+import type { Firestore } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore';
+
+import { isDemoMode } from "@/lib/appMode";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,9 +17,17 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-if (!getApps().length) {
+const hasFirebaseConfig =
+  !!firebaseConfig.apiKey &&
+  !!firebaseConfig.authDomain &&
+  !!firebaseConfig.projectId &&
+  !!firebaseConfig.appId;
+
+const shouldInitFirebase = !isDemoMode() && hasFirebaseConfig;
+
+if (shouldInitFirebase && !getApps().length) {
   initializeApp(firebaseConfig);
 }
 
-export const auth = getAuth();
-export const db = getFirestore();
+export const auth: Auth = shouldInitFirebase ? getAuth() : (null as unknown as Auth);
+export const db: Firestore = shouldInitFirebase ? getFirestore() : (null as unknown as Firestore);

@@ -7,7 +7,7 @@ import { TransformedDataMeta, TransformedDataRecord } from "@/models/transformed
 import { fetchSheetData } from "@/lib/sheets";
 import { executeDataPipelineCore, type DataPipelineResult } from "@shared/pipeline";
 import type { TransformResult } from "@shared/mapping";
-import { createFirestoreTransformedDataRepo, createFirestoreValidationSpecRepo } from "@/lib/repos";
+import { createTransformedDataRepo, createValidationSpecRepo } from "@/lib/repos";
 import type { TransformedDataRepoKey } from "@shared/repos";
 
 /**
@@ -41,12 +41,12 @@ export async function executeDataPipeline(
   sheetName: string,
   mapping: SheetMapping
 ): Promise<PipelineResult> {
-  const transformedDataRepo = createFirestoreTransformedDataRepo(db);
+  const transformedDataRepo = createTransformedDataRepo(db);
 
   // specの日時フォーマット等を変換に反映する（取得できない場合は従来通り）
   let validationSpec: import("@shared/mapping").ValidationSpec | undefined;
   try {
-    const validationSpecRepo = createFirestoreValidationSpecRepo(db);
+    const validationSpecRepo = createValidationSpecRepo(db);
     const spec = await validationSpecRepo.get({
       key: { userId, projectId, folderId, sheetId },
       specId: sheetName || "default",
@@ -98,7 +98,7 @@ export async function getLatestTransformedDataMeta(
   folderId: string,
   sheetId: string
 ): Promise<TransformedDataMeta | null> {
-  const repo = createFirestoreTransformedDataRepo(db);
+  const repo = createTransformedDataRepo(db);
   const key = buildTransformedDataRepoKey(userId, projectId, folderId, sheetId);
   const meta = await repo.getLatestMeta?.({ key });
   return (meta as unknown as TransformedDataMeta) ?? null;
@@ -115,7 +115,7 @@ export async function getTransformedDataRecords(
   metaId: string,
   limitCount: number = 100
 ): Promise<TransformedDataRecord[]> {
-  const repo = createFirestoreTransformedDataRepo(db);
+  const repo = createTransformedDataRepo(db);
   const key = buildTransformedDataRepoKey(userId, projectId, folderId, sheetId);
   const records = await repo.getRecords?.({ key, metaId, limitCount });
   return (records as unknown as TransformedDataRecord[]) ?? [];
@@ -131,7 +131,7 @@ export async function getTransformHistory(
   sheetId: string,
   limitCount: number = 10
 ): Promise<TransformedDataMeta[]> {
-  const repo = createFirestoreTransformedDataRepo(db);
+  const repo = createTransformedDataRepo(db);
   const key = buildTransformedDataRepoKey(userId, projectId, folderId, sheetId);
   const history = await repo.getHistory?.({ key, limitCount });
   return (history as unknown as TransformedDataMeta[]) ?? [];

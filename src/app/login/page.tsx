@@ -1,1 +1,7 @@
-export { default, metadata } from "./LoginPage";
+import LoginPage from "./LoginPage";
+
+export const metadata = {
+	title: "Login | SheetHive",
+};
+
+export default LoginPage;

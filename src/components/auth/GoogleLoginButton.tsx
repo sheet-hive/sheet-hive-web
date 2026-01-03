@@ -11,12 +11,21 @@ import {
 import { auth, db } from "../../lib/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { upsertUser } from "../../lib/user";
+import { isDemoMode } from "@/lib/appMode";
 
 export default function GoogleLoginButton(): JSX.Element {
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
 
   useEffect(() => {
+    if (isDemoMode()) {
+      setUser({
+        uid: "demo-user",
+        displayName: "Demo User",
+        email: "demo@example.com",
+      } as unknown as User);
+      return;
+    }
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
@@ -28,6 +37,10 @@ export default function GoogleLoginButton(): JSX.Element {
   }, []);
 
   const signIn = async () => {
+    if (isDemoMode()) {
+      router.replace("/projects");
+      return;
+    }
     try {
       const provider = new GoogleAuthProvider();
       // スプレッドシート読み取りスコープを付与
@@ -64,6 +77,10 @@ export default function GoogleLoginButton(): JSX.Element {
   };
 
   const logout = async () => {
+    if (isDemoMode()) {
+      router.replace("/projects");
+      return;
+    }
     try {
       await signOut(auth);
     } catch (err) {
@@ -81,12 +98,14 @@ export default function GoogleLoginButton(): JSX.Element {
             <div className="font-medium">{user.displayName ?? user.email}</div>
             <div className="text-sm text-gray-500">{user.email}</div>
           </div>
-          <button
-            onClick={logout}
-            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-          >
-            Sign out
-          </button>
+          {!isDemoMode() && (
+            <button
+              onClick={logout}
+              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              Sign out
+            </button>
+          )}
         </div>
       ) : (
         <button

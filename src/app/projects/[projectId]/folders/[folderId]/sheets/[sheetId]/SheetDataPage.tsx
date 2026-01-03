@@ -3,15 +3,16 @@ import { use, useMemo } from "react";
 import DataGrid from "@/components/sheet/DataGrid";
 import Sidebar from "@/components/layout/Sidebar";
 import Breadcrumb from "@/components/layout/Breadcrumb";
-import { Timestamp } from "firebase/firestore";
 import Loading from "@/components/layout/Loading";
 import SheetMappingEditor from "@/components/sheet/SheetMappingEditor";
 import AlertDialog from "@/components/common/AlertDialog";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+import InfoDialog from "@/components/common/InfoDialog";
 import ValidationTab from "@/components/sheet/validation/ValidationTab";
 import SheetManagementTab from "@/components/sheet/management/SheetManagementTab";
 import { formatTransformError, getTransformSummary } from "@/lib/dataTransform";
 import { useSheetDataPageLogic } from "@/hooks/useSheetDataPageLogic";
+import { isDemoMode } from "@/lib/appMode";
 
 type PageProps = {
   params: Promise<{
@@ -26,6 +27,37 @@ export default function SheetDataPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const { projectId, folderId, sheetId } = resolvedParams;
   const logic = useSheetDataPageLogic({ projectId, folderId, sheetId });
+  const demo = isDemoMode();
+
+  const toJsDate = (value: unknown): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value === "string" || typeof value === "number") {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof value === "object") {
+      const v = value as { toDate?: unknown; seconds?: unknown };
+      if (typeof v.toDate === "function") {
+        try {
+          const d = (v.toDate as () => unknown)();
+          return d instanceof Date ? d : null;
+        } catch {
+          return null;
+        }
+      }
+      if (typeof v.seconds === "number") {
+        const d = new Date(v.seconds * 1000);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+    }
+    return null;
+  };
+
+  const formatDateTimeJa = (value: unknown): string => {
+    const d = toJsDate(value);
+    return d ? d.toLocaleString("ja-JP") : "";
+  };
 
   const escapeCsvCell = (v: string): string => {
     const s = (v ?? "").toString();
@@ -173,6 +205,12 @@ export default function SheetDataPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-neutral-900 text-black dark:text-white">
+      <InfoDialog
+        open={logic.infoDialogOpen}
+        title={logic.infoDialogTitle}
+        message={logic.infoDialogMessage}
+        onClose={logic.closeInfoDialog}
+      />
       <AlertDialog
         open={logic.showMissingMappingAlert}
         message={"バリデーションを実行するにはマッピング設定が必要です。\n先に「マッピング設定」タブで設定してください。"}
@@ -294,14 +332,16 @@ export default function SheetDataPage({ params }: PageProps) {
               >
                 {logic.syncing ? "同期中..." : "手動同期"}
               </button>
-              <a
-                href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                元のシートを開く
-              </a>
+              {!demo && (
+                <a
+                  href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  元のシートを開く
+                </a>
+              )}
             </div>
 
             {/* 同期ログ */}
@@ -329,7 +369,7 @@ export default function SheetDataPage({ params }: PageProps) {
                           {log.status}
                         </span>
                         <span className="text-neutral-600 dark:text-neutral-400">
-                          {log.startedAt instanceof Timestamp ? log.startedAt.toDate().toLocaleString("ja-JP") : ""}
+                          {formatDateTimeJa(log.startedAt)}
                         </span>
                         <span className="text-neutral-500">
                           {log.recordsProcessed > 0 && `${log.recordsSuccess}/${log.recordsProcessed}件成功`}
@@ -514,7 +554,7 @@ export default function SheetDataPage({ params }: PageProps) {
                     <div>
                       <div className="text-sm text-neutral-600 dark:text-neutral-400">変換日時</div>
                       <div className="text-sm">
-                        {logic.latestTransform.transformedAt?.toDate().toLocaleString("ja-JP")}
+                        {formatDateTimeJa(logic.latestTransform.transformedAt)}
                       </div>
                     </div>
                     <div>
@@ -555,7 +595,7 @@ export default function SheetDataPage({ params }: PageProps) {
                         {logic.transformHistory.map((item, idx) => (
                           <tr key={idx} className="hover:bg-neutral-100 dark:hover:bg-neutral-700">
                             <td className="border px-3 py-2 text-sm">
-                              {item.transformedAt?.toDate().toLocaleString("ja-JP")}
+                              {formatDateTimeJa(item.transformedAt)}
                             </td>
                             <td className="border px-3 py-2 text-sm">
                               {item.status === "success" ? "✅ 成功" : 

@@ -3,12 +3,47 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { collection, query, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isDemoMode } from "@/lib/appMode";
+import { demoApi } from "@/demo/demoApi";
+import { subscribeDemoState } from "@/demo/demoStore";
 import { Folder } from "@/models/folder";
 import { Sheet } from "@/models/sheet";
 import { Project } from "@/models/project";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import KPICard from "@/components/dashboard/KPICard";
+
+function toValidDate(input: unknown): Date | null {
+  if (!input) return null;
+
+  if (input instanceof Date) {
+    return Number.isNaN(input.getTime()) ? null : input;
+  }
+
+  if (typeof input === "string" || typeof input === "number") {
+    const d = new Date(input);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof input === "object") {
+    const obj = input as any;
+
+    if (typeof obj.toDate === "function") {
+      const d = obj.toDate();
+      return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+    }
+
+    const seconds = typeof obj.seconds === "number" ? obj.seconds : typeof obj._seconds === "number" ? obj._seconds : null;
+    const nanoseconds = typeof obj.nanoseconds === "number" ? obj.nanoseconds : typeof obj._nanoseconds === "number" ? obj._nanoseconds : 0;
+    if (seconds !== null) {
+      const ms = seconds * 1000 + Math.floor(nanoseconds / 1e6);
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  return null;
+}
 
 interface DashboardData {
   totalSheets: number;
@@ -39,6 +74,62 @@ export default function DashboardPage() {
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
+
+      if (isDemoMode()) {
+        const project = await demoApi.getProject(projectId);
+        setProject(project);
+
+        const folders = await demoApi.listFolders(projectId);
+
+        let totalSheets = 0;
+        let totalRecords = 0;
+        let totalSuccessRecords = 0;
+        let totalErrorRecords = 0;
+        let latestValidation: Date | null = null;
+
+        for (const folder of folders) {
+          if (!folder.id) continue;
+          const sheets = await demoApi.listSheets(projectId, folder.id);
+          totalSheets += sheets.length;
+
+          for (const sheet of sheets) {
+            const validationTotal = (sheet as any).lastValidationTotalRows;
+            const validationError = (sheet as any).lastValidationErrorRows;
+            const validatedAt = (sheet as any).lastValidatedAt;
+
+            const hasValidationStats = typeof validationTotal === "number" && typeof validationError === "number";
+            if (hasValidationStats) {
+              const total = Math.max(0, validationTotal);
+              const errorCount = Math.max(0, validationError);
+              const successCount = Math.max(0, total - errorCount);
+              totalRecords += total;
+              totalSuccessRecords += successCount;
+              totalErrorRecords += errorCount;
+            }
+
+            if (validatedAt) {
+              const validationDate = toValidDate(validatedAt);
+              if (validationDate && (!latestValidation || validationDate > latestValidation)) {
+                latestValidation = validationDate;
+              }
+            }
+          }
+        }
+
+        const qualityScore = totalRecords > 0 ? Math.round((totalSuccessRecords / totalRecords) * 100) : 0;
+
+        setDashboardData({
+          totalSheets,
+          totalFolders: folders.length,
+          totalRecords,
+          totalSuccessRecords,
+          totalErrorRecords,
+          dataQualityScore: qualityScore,
+          lastValidationDate: latestValidation,
+        });
+
+        return;
+      }
 
       // プロジェクト情報取得
       const projectDoc = await getDoc(doc(db, `projects/${projectId}`));
@@ -95,10 +186,8 @@ export default function DashboardPage() {
           }
 
           if (validatedAt) {
-            const validationDate = validatedAt.toDate
-              ? validatedAt.toDate()
-              : (validatedAt as unknown as Date);
-            if (!latestValidation || validationDate > latestValidation) {
+            const validationDate = toValidDate(validatedAt);
+            if (validationDate && (!latestValidation || validationDate > latestValidation)) {
               latestValidation = validationDate;
             }
           }
@@ -127,7 +216,13 @@ export default function DashboardPage() {
   }, [projectId]);
 
   useEffect(() => {
-    loadDashboardData();
+    void loadDashboardData();
+    if (!isDemoMode()) return;
+
+    const unsub = subscribeDemoState(() => {
+      void loadDashboardData();
+    });
+    return () => unsub();
   }, [loadDashboardData]);
 
   return (

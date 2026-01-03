@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import ProjectFolders from "../../../components/project/ProjectFolders";
 import ProjectDashboardContent from "../../../components/project/ProjectDashboardContent";
@@ -11,20 +10,23 @@ import Sidebar from "@/components/layout/Sidebar";
 import Tabs, { TabPanel } from "@/components/layout/Tabs";
 import { Project } from "@/models/project";
 import Loading from "@/components/layout/Loading";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
 
 type ProjectPageProps = {
   params: Promise<{ projectId: string }>;
 };
 
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [projectId, setProjectId] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = subscribeAuthUser((u) => setUser(u));
     return () => unsub();
   }, []);
 
@@ -38,6 +40,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     if (!user || !projectId) return;
     const fetchProject = async () => {
       try {
+        if (isDemoMode()) {
+          const p = await demoApi.getProject(projectId);
+          setProject(p);
+          return;
+        }
         const docRef = doc(db, "users", user.uid, "projects", projectId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {

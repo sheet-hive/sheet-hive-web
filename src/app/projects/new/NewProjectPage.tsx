@@ -1,8 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "../../../lib/firebase";
+import { db } from "../../../lib/firebase";
 import {
   collection,
   addDoc,
@@ -11,10 +10,13 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import Sidebar from "@/components/layout/Sidebar";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -22,7 +24,7 @@ export default function NewProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = subscribeAuthUser((u) => setUser(u));
     return () => unsub();
   }, []);
 
@@ -33,6 +35,15 @@ export default function NewProjectPage() {
     
     setIsSubmitting(true);
     try {
+      if (isDemoMode()) {
+        await demoApi.createProject({
+          title: title.trim(),
+          description: description.trim() || null,
+          status,
+        });
+        router.push("/projects");
+        return;
+      }
       const col = collection(db, "users", user.uid, "projects");
       const ref = await addDoc(col, {
         title: title.trim(),

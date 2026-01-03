@@ -1,13 +1,17 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "../../lib/firebase";
+import { Timestamp } from "firebase/firestore";
+import { db } from "../../lib/firebase";
 import {
   doc,
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { fetchSheetMetadata, isTokenExpiredError } from "../../lib/sheets";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
+import type { Sheet } from "@/models/sheet";
 
 function extractSheetId(input: string) {
   const urlMatch = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
@@ -23,14 +27,12 @@ type SheetConnectProps = {
 };
 
 export default function SheetConnect({ projectId, folderId, onSheetAdded }: SheetConnectProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [input, setInput] = useState("");
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
-    return () => unsubAuth();
+    const unsub = subscribeAuthUser((u) => setUser(u));
+    return () => unsub();
   }, []);
 
   const addSheet = async (e?: React.FormEvent) => {
@@ -69,21 +71,38 @@ export default function SheetConnect({ projectId, folderId, onSheetAdded }: Shee
       const ref = projectId && folderId
         ? doc(db, "users", user.uid, "projects", projectId, "folders", folderId, "sheets", sheetId)
         : doc(db, "users", user.uid, "sheets", sheetId);
-      
-      await setDoc(
-        ref,
-        {
+
+      if (isDemoMode() && projectId && folderId) {
+        const now = Timestamp.now();
+        const meta = await fetchSheetMetadata(sheetId);
+        const sheet: Sheet = {
+          id: sheetId,
           sheetId,
           url: input,
-          title,
-          sheetCount,
-          addedAt: serverTimestamp(),
-          lastFetched: serverTimestamp(),
-          isAccessible,
-          lastError,
-        },
-        { merge: true }
-      );
+          title: meta.title ?? title,
+          sheetCount: meta.sheetCount ?? sheetCount,
+          addedAt: now,
+          lastFetched: now,
+          isAccessible: true,
+          lastError: null,
+        };
+        await demoApi.upsertSheet(projectId, folderId, sheet);
+      } else {
+        await setDoc(
+          ref,
+          {
+            sheetId,
+            url: input,
+            title,
+            sheetCount,
+            addedAt: serverTimestamp(),
+            lastFetched: serverTimestamp(),
+            isAccessible,
+            lastError,
+          },
+          { merge: true }
+        );
+      }
       
       setInput("");
       if (onSheetAdded) onSheetAdded();

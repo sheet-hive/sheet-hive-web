@@ -1,34 +1,59 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { signOut, type User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import { auth, db } from "../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { UserProfile } from "@/models/user";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
+  const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    const unsub = subscribeAuthUser((u) => {
       setUser(u);
-      if (u) {
-        try {
-          const ref = doc(db, "users", u.uid);
-          const snap = await getDoc(ref);
-          if (snap.exists()) {
-            setProfile(snap.data() as UserProfile);
-          }
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error(err);
-        }
-      }
     });
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    if (isDemoMode()) {
+      void (async () => {
+        const p = await demoApi.getCurrentUserProfile();
+        setProfile({
+          uid: p.uid,
+          displayName: p.displayName ?? null,
+          email: p.email ?? null,
+        } as UserProfile);
+      })();
+      return;
+    }
+
+    void (async () => {
+      try {
+        const ref = doc(db, "users", user.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          setProfile(snap.data() as UserProfile);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(err);
+      }
+    })();
+  }, [user]);
+
   const logout = async () => {
+    if (isDemoMode()) {
+      router.replace("/projects");
+      return;
+    }
     await signOut(auth);
   };
 
@@ -50,7 +75,7 @@ export default function ProfilePage() {
           onClick={logout}
           className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
         >
-          Sign out
+          {isDemoMode() ? "戻る" : "Sign out"}
         </button>
       </div>
     </main>

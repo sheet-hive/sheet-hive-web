@@ -35,7 +35,7 @@ export default function SheetRecordsChart({ data }: SheetRecordsChartProps) {
   }
 
   // シート名を短縮する関数（長すぎる場合）
-  const truncateSheetName = (name: string, maxLength: number = 15) => {
+  const truncateSheetName = (name: string, maxLength: number = 12) => {
     if (name.length <= maxLength) return name;
     return name.substring(0, maxLength - 3) + "...";
   };
@@ -52,25 +52,25 @@ export default function SheetRecordsChart({ data }: SheetRecordsChartProps) {
       <BarChart
         data={chartData}
         margin={{
-          top: 5,
+          top: 30,
           right: 30,
           left: 20,
-          bottom: 5,
+          bottom: 10,
         }}
       >
         <CartesianGrid strokeDasharray="3 3" className="stroke-neutral-200 dark:stroke-neutral-700" />
         <XAxis 
           dataKey="name" 
           className="text-xs"
-          tick={{ fill: 'currentColor' }}
+          tick={{ fill: "currentColor", fontSize: 10 }}
           stroke="currentColor"
-          angle={-45}
+          angle={-30}
           textAnchor="end"
-          height={80}
+          height={60}
         />
         <YAxis 
           className="text-xs"
-          tick={{ fill: 'currentColor' }}
+          tick={{ fill: "currentColor" }}
           stroke="currentColor"
         />
         <Tooltip 
@@ -95,7 +95,12 @@ export default function SheetRecordsChart({ data }: SheetRecordsChartProps) {
             return item?.fullName || label;
           }}
         />
-        <Legend />
+        <Legend
+          verticalAlign="top"
+          align="right"
+          height={24}
+          wrapperStyle={{ fontSize: 12 }}
+        />
         <Bar
           dataKey="successRecords"
           name="成功レコード"

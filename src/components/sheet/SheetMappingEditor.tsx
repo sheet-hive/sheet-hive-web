@@ -1,6 +1,8 @@
 "use client";
 import { FieldMapping, DataType, SheetMapping } from "@/models/mapping";
 import { useSheetMappingEditorLogic } from "@/hooks/useSheetMappingEditorLogic";
+import InfoDialog from "@/components/common/InfoDialog";
+import { useCallback, useState } from "react";
 
 type SheetMappingEditorProps = {
   sheetData: string[][];
@@ -43,6 +45,20 @@ export default function SheetMappingEditor({
   onSave,
   onHasChangesChange,
 }: SheetMappingEditorProps) {
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [infoDialogTitle, setInfoDialogTitle] = useState("");
+  const [infoDialogMessage, setInfoDialogMessage] = useState("");
+
+  const openInfoDialog = useCallback((title: string, message: string) => {
+    setInfoDialogTitle(title);
+    setInfoDialogMessage(message);
+    setInfoDialogOpen(true);
+  }, []);
+
+  const closeInfoDialog = useCallback(() => {
+    setInfoDialogOpen(false);
+  }, []);
+
   const {
     mapping,
     isSaving,
@@ -59,6 +75,7 @@ export default function SheetMappingEditor({
     initialHasChanges,
     onSave,
     onHasChangesChange,
+    onNotify: openInfoDialog,
   });
 
   if (!mapping) {
@@ -74,6 +91,13 @@ export default function SheetMappingEditor({
 
   return (
     <div className="space-y-6">
+      <InfoDialog
+        open={infoDialogOpen}
+        title={infoDialogTitle}
+        message={infoDialogMessage}
+        onClose={closeInfoDialog}
+      />
+
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>

@@ -1,22 +1,36 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { Project } from "@/models/project";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
+import { subscribeDemoState } from "@/demo/demoStore";
 
 export default function ProjectEditButton({ projectId }: { projectId: string }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = subscribeAuthUser((u) => setUser(u));
     return () => unsub();
   }, []);
 
   useEffect(() => {
     if (!user || !user.uid) return;
+
+    if (isDemoMode()) {
+      const load = async () => {
+        const p = await demoApi.getProject(projectId);
+        setProject(p);
+      };
+      void load();
+      const unsub = subscribeDemoState(() => void load());
+      return () => unsub();
+    }
+
     const ref = doc(db, "users", user.uid, "projects", projectId);
     const unsub = onSnapshot(ref, (snap) => {
       setProject(snap.exists() ? (snap.data() as Project) : null);

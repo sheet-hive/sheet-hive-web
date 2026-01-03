@@ -1,11 +1,23 @@
-import React from "react";
+"use client";
+
+import React, { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import GoogleLoginButton from "../../components/auth/GoogleLoginButton";
+import { isDemoMode } from "@/lib/appMode";
 
 export const metadata = {
   title: "Login | SheetHive",
 };
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isDemoMode()) {
+      router.replace("/projects");
+    }
+  }, [router]);
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-black px-4">
       <div className="max-w-md w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow p-6 rounded">

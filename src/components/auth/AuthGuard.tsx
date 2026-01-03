@@ -1,8 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../../lib/firebase";
+import { subscribeAuthUser } from "@/lib/authState";
 
 export default function AuthGuard({
   children,
@@ -13,7 +12,7 @@ export default function AuthGuard({
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = subscribeAuthUser((user) => {
       if (!user) {
         // 未ログインなら /login へ遷移
         router.replace("/login");

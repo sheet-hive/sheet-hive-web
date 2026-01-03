@@ -1,18 +1,21 @@
 "use client";
 import React, { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { doc, onSnapshot, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { Project } from "@/models/project";
 import Title from "@/components/layout/Title";
 import Loading from "@/components/layout/Loading";
 import Sidebar from "@/components/layout/Sidebar";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
+import { subscribeDemoState } from "@/demo/demoStore";
 
 export default function ProjectEditPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params);
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -22,7 +25,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ projectI
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = subscribeAuthUser((u) => {
       setUser(u);
       if (!u) router.push("/login");
     });
@@ -31,6 +34,23 @@ export default function ProjectEditPage({ params }: { params: Promise<{ projectI
 
   useEffect(() => {
     if (!user || !user.uid) return;
+
+    if (isDemoMode()) {
+      const load = async () => {
+        const p = await demoApi.getProject(projectId);
+        if (p) {
+          setProject(p);
+          setTitle(p.title || "");
+          setDescription(p.description || "");
+          setStatus(p.status || "active");
+        }
+        setLoading(false);
+      };
+      void load();
+      const unsub = subscribeDemoState(() => void load());
+      return () => unsub();
+    }
+
     const ref = doc(db, "users", user.uid, "projects", projectId);
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) {
@@ -58,6 +78,11 @@ export default function ProjectEditPage({ params }: { params: Promise<{ projectI
 
     setSaving(true);
     try {
+      if (isDemoMode()) {
+        await demoApi.updateProject(projectId, { title, description, status } as Partial<Project>);
+        router.push(`/projects/${projectId}`);
+        return;
+      }
       const ref = doc(db, "users", user.uid, "projects", projectId);
       await updateDoc(ref, {
         title,
@@ -97,6 +122,12 @@ export default function ProjectEditPage({ params }: { params: Promise<{ projectI
 
     setDeleting(true);
     try {
+      if (isDemoMode()) {
+        await demoApi.deleteProject(projectId);
+        alert("プロジェクトを削除しました");
+        router.push("/projects");
+        return;
+      }
       const ref = doc(db, "users", user.uid, "projects", projectId);
       await deleteDoc(ref);
       alert("プロジェクトを削除しました");

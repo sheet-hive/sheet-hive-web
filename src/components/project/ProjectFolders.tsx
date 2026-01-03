@@ -1,15 +1,18 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import Link from "next/link";
 import { Folder } from "@/models/folder";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
+import { subscribeDemoState } from "@/demo/demoStore";
 
 type FolderNode = Folder & { children: FolderNode[] };
 
 export default function ProjectFolders({ projectId }: { projectId: string }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -19,12 +22,24 @@ export default function ProjectFolders({ projectId }: { projectId: string }) {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = subscribeAuthUser((u) => setUser(u));
     return () => unsub();
   }, []);
 
   useEffect(() => {
     if (!user || !user.uid) return;
+
+    if (isDemoMode()) {
+      const load = async () => {
+        const list = await demoApi.listFolders(projectId);
+        setFolders(list);
+        setLoading(false);
+      };
+      void load();
+      const unsub = subscribeDemoState(() => void load());
+      return () => unsub();
+    }
+
     const col = collection(db, "users", user.uid, "projects", projectId, "folders");
     const q = query(col, orderBy("createdAt", "asc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -44,6 +59,12 @@ export default function ProjectFolders({ projectId }: { projectId: string }) {
     if (!user) return alert("ログインしてください");
     if (!name.trim()) return alert("フォルダ名を入力してください");
     try {
+      if (isDemoMode()) {
+        await demoApi.createFolder(projectId, { name: name.trim(), parentId: parentId || null });
+        setName("");
+        setParentId(null);
+        return;
+      }
       const col = collection(db, "users", user.uid, "projects", projectId, "folders");
       await addDoc(col, { name: name.trim(), parentId: parentId || null, createdAt: serverTimestamp() });
       setName("");
@@ -68,6 +89,12 @@ export default function ProjectFolders({ projectId }: { projectId: string }) {
   const saveFolder = async (folderId: string) => {
     if (!user || !editingName.trim()) return;
     try {
+      if (isDemoMode()) {
+        await demoApi.updateFolder(projectId, folderId, { name: editingName.trim() });
+        setEditingId(null);
+        setEditingName("");
+        return;
+      }
       const folderRef = doc(db, "users", user.uid, "projects", projectId, "folders", folderId);
       await updateDoc(folderRef, { name: editingName.trim() });
       setEditingId(null);
@@ -82,6 +109,11 @@ export default function ProjectFolders({ projectId }: { projectId: string }) {
     if (!user) return;
     if (!confirm("このフォルダを削除しますか？")) return;
     try {
+      if (isDemoMode()) {
+        await demoApi.deleteFolder(projectId, folderId);
+        setMenuOpenId(null);
+        return;
+      }
       const folderRef = doc(db, "users", user.uid, "projects", projectId, "folders", folderId);
       await deleteDoc(folderRef);
       setMenuOpenId(null);

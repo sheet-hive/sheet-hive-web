@@ -4,21 +4,24 @@ import Sidebar from "@/components/layout/Sidebar";
 import SheetConnect from "@/components/sheet/SheetConnect";
 import SheetList from "@/components/sheet/SheetList";
 import React, { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { Folder } from "@/models/folder";
 import { Project } from "@/models/project";
 import { Sheet } from "@/models/sheet";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import Loading from "@/components/layout/Loading";
+import { isDemoMode } from "@/lib/appMode";
+import { subscribeAuthUser, type AppUser } from "@/lib/authState";
+import { demoApi } from "@/demo/demoApi";
+import { subscribeDemoState } from "@/demo/demoStore";
 
 type FolderPageProps = {
   params: Promise<{ projectId: string; folderId: string }>;
 };
 
 export default function FolderDetailPage({ params }: FolderPageProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [folder, setFolder] = useState<Folder | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [sheets, setSheets] = useState<Sheet[]>([]);
@@ -28,7 +31,7 @@ export default function FolderDetailPage({ params }: FolderPageProps) {
   const [folderId, setFolderId] = useState("");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = subscribeAuthUser((u) => setUser(u));
     return () => unsub();
   }, []);
 
@@ -43,6 +46,13 @@ export default function FolderDetailPage({ params }: FolderPageProps) {
     if (!user || !projectId || !folderId) return;
     const fetchData = async () => {
       try {
+        if (isDemoMode()) {
+          const p = await demoApi.getProject(projectId);
+          const f = await demoApi.getFolder(projectId, folderId);
+          setProject(p);
+          setFolder(f);
+          return;
+        }
         // Fetch project
         const projectRef = doc(db, "users", user.uid, "projects", projectId);
         const projectSnap = await getDoc(projectRef);
@@ -67,6 +77,20 @@ export default function FolderDetailPage({ params }: FolderPageProps) {
 
   useEffect(() => {
     if (!user || !projectId || !folderId) return;
+
+    if (isDemoMode()) {
+      const load = async () => {
+        const list = await demoApi.listSheets(projectId, folderId);
+        setSheets(list);
+        setSheetsLoading(false);
+      };
+      void load();
+      const unsub = subscribeDemoState(() => {
+        void load();
+      });
+      return () => unsub();
+    }
+
     const col = collection(db, "users", user.uid, "projects", projectId, "folders", folderId, "sheets");
     const q = query(col, orderBy("addedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {

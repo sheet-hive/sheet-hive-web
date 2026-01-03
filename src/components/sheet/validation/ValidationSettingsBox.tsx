@@ -10,6 +10,25 @@ import ToggleRow from "@/components/sheet/validation/inputs/ToggleRow";
 import type { DataType } from "@/models/mapping";
 import type { RowRule, ValidationSpec } from "@shared/mapping";
 
+const dataTypeBadgeColors: Record<DataType, string> = {
+  string: "bg-orange-100 dark:bg-orange-700 text-orange-800 dark:text-orange-100",
+  integer: "bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100",
+  decimal: "bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100",
+  date: "bg-purple-100 dark:bg-purple-800 text-purple-800 dark:text-purple-100",
+  time: "bg-sky-100 dark:bg-sky-800 text-sky-800 dark:text-sky-100",
+  datetime: "bg-indigo-100 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-100",
+  boolean: "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100",
+  phone: "bg-yellow-100 dark:bg-yellow-700 text-yellow-800 dark:text-yellow-100",
+  unknown: "bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100",
+  number: "bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100",
+};
+
+function dataTypeBadgeClass(dataType: DataType | null, isGlobal: boolean): string {
+  if (isGlobal) return "bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100";
+  const t = dataType ?? "unknown";
+  return dataTypeBadgeColors[t];
+}
+
 type Props = {
   selectedColKey: string;
   setSelectedColKey: (colKey: string) => void;
@@ -929,7 +948,14 @@ export default function ValidationSettingsBox(props: Props) {
 
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm text-neutral-700 dark:text-neutral-300">データの種類</div>
-            <div className="text-sm font-mono text-neutral-700 dark:text-neutral-300">{dataTypeLabel}</div>
+            <span
+              className={
+                "inline-flex items-center px-2 py-0.5 text-xs font-medium rounded " +
+                dataTypeBadgeClass(dataType, isGlobalSelected)
+              }
+            >
+              {dataTypeLabel}
+            </span>
           </div>
 
           {show("required") && (
@@ -1402,17 +1428,6 @@ export default function ValidationSettingsBox(props: Props) {
                       ルールを追加
                     </button>
                   </div>
-                </div>
-
-                <div className="text-xs text-neutral-600 dark:text-neutral-400">
-                  ※ equals/条件付き禁止/条件付き許可は「完全一致」で判定します（trimなし・大小区別あり）。
-                  条件付き許可の許可値はカンマ区切りで複数指定できます（例: A, B, C）。
-                  条件付き必須の「null/非null」はtrimありで空判定します。
-                  数値カラムの条件付き必須/禁止（特定の値）は数値として比較します（カンマは無視します）。
-                  数値の大小関係は「制御対象」カラムを「条件」カラムと比較します。
-                  日時の前後関係は「制御対象」カラムを「条件」カラムと比較します。
-                  時刻の前後関係は「制御対象」カラムを「条件」カラムと比較します。
-                  条件/制御対象のどちらかが空欄のルールは判定しません（MVP方針）。
                 </div>
               </div>
             </SettingsBox>

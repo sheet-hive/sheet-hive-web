@@ -8,6 +8,41 @@ import Loading from "@/components/layout/Loading";
 import DataQualityChart from "@/components/dashboard/DataQualityChart";
 import SheetRecordsChart from "@/components/dashboard/SheetRecordsChart";
 import DashboardFilter, { DashboardFilters } from "@/components/dashboard/DashboardFilter";
+import { isDemoMode } from "@/lib/appMode";
+import { demoApi } from "@/demo/demoApi";
+import { subscribeDemoState } from "@/demo/demoStore";
+
+function toValidDate(input: unknown): Date | null {
+  if (!input) return null;
+
+  if (input instanceof Date) {
+    return Number.isNaN(input.getTime()) ? null : input;
+  }
+
+  if (typeof input === "string" || typeof input === "number") {
+    const d = new Date(input);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof input === "object") {
+    const obj = input as any;
+
+    if (typeof obj.toDate === "function") {
+      const d = obj.toDate();
+      return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+    }
+
+    const seconds = typeof obj.seconds === "number" ? obj.seconds : typeof obj._seconds === "number" ? obj._seconds : null;
+    const nanoseconds = typeof obj.nanoseconds === "number" ? obj.nanoseconds : typeof obj._nanoseconds === "number" ? obj._nanoseconds : 0;
+    if (seconds !== null) {
+      const ms = seconds * 1000 + Math.floor(nanoseconds / 1e6);
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  return null;
+}
 
 interface DashboardData {
   totalSheets: number;
@@ -65,6 +100,129 @@ export default function ProjectDashboardContent({ projectId, userId }: ProjectDa
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
+
+      if (isDemoMode()) {
+        const folders = await demoApi.listFolders(projectId);
+
+        let totalSheets = 0;
+        let totalRecords = 0;
+        let totalSuccessRecords = 0;
+        let totalErrorRecords = 0;
+        let latestValidation: Date | null = null;
+        let maxRecordsInSheet = 0;
+        let validatedSheetCount = 0;
+
+        const qualityHistory: Array<{
+          dateKey: string;
+          dateLabel: string;
+          totalRecords: number;
+          successRecords: number;
+        }> = [];
+
+        const sheetRecordsArray: Array<{
+          sheetName: string;
+          records: number;
+          successRecords: number;
+          errorRecords: number;
+        }> = [];
+
+        const allSheetsArray: Sheet[] = [];
+
+        for (const folder of folders) {
+          const sheets = await demoApi.listSheets(projectId, folder.id!);
+          sheets.forEach((sheet) => {
+            allSheetsArray.push({ ...sheet, folderId: folder.id } as Sheet & { folderId: string });
+          });
+          totalSheets += sheets.length;
+
+          for (const sheet of sheets) {
+            const validationTotal = sheet.lastValidationTotalRows;
+            const validationError = sheet.lastValidationErrorRows;
+            const validatedAt = sheet.lastValidatedAt;
+
+            const hasValidationStats =
+              typeof validationTotal === "number" && typeof validationError === "number";
+            if (!hasValidationStats) continue;
+
+            validatedSheetCount += 1;
+            const total = Math.max(0, validationTotal);
+            const errorCount = Math.max(0, validationError);
+            const successCount = Math.max(0, total - errorCount);
+
+            totalRecords += total;
+            totalSuccessRecords += successCount;
+            totalErrorRecords += errorCount;
+            if (total > maxRecordsInSheet) maxRecordsInSheet = total;
+
+            sheetRecordsArray.push({
+              sheetName: sheet.title || `Sheet ${sheet.id}`,
+              records: total,
+              successRecords: successCount,
+              errorRecords: errorCount,
+            });
+
+            const validationDate = toValidDate(validatedAt);
+            if (validationDate) {
+              if (!latestValidation || validationDate > latestValidation) latestValidation = validationDate;
+              const dateKey = validationDate.toISOString().slice(0, 10);
+              const dateLabel = validationDate.toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
+              qualityHistory.push({ dateKey, dateLabel, totalRecords: total, successRecords: successCount });
+            }
+          }
+        }
+
+        const qualityScore = totalRecords > 0 ? Math.round((totalSuccessRecords / totalRecords) * 100) : 0;
+        const avgRecordsPerSheet = validatedSheetCount > 0 ? Math.round(totalRecords / validatedSheetCount) : 0;
+        const errorRate = totalRecords > 0 ? Math.round((totalErrorRecords / totalRecords) * 100 * 10) / 10 : 0;
+        const avgSheetsPerFolder = folders.length > 0 ? Math.round((totalSheets / folders.length) * 10) / 10 : 0;
+
+        const chartDataMap = new Map<string, { dateLabel: string; totalRecords: number; successRecords: number }>();
+        qualityHistory.forEach((item) => {
+          if (chartDataMap.has(item.dateKey)) {
+            const existing = chartDataMap.get(item.dateKey)!;
+            existing.totalRecords += item.totalRecords;
+            existing.successRecords += item.successRecords;
+          } else {
+            chartDataMap.set(item.dateKey, {
+              dateLabel: item.dateLabel,
+              totalRecords: item.totalRecords,
+              successRecords: item.successRecords,
+            });
+          }
+        });
+
+        const aggregatedChartData = Array.from(chartDataMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .slice(-10)
+          .map(([, data]) => {
+            const rate = data.totalRecords > 0 ? (data.successRecords / data.totalRecords) * 100 : 0;
+            const score = Math.round(rate);
+            return { date: data.dateLabel, qualityScore: score, successRate: score };
+          });
+
+        const topSheetRecords = sheetRecordsArray.sort((a, b) => b.records - a.records).slice(0, 10);
+
+        setFolders(folders);
+        setAllSheets(allSheetsArray);
+        setDashboardData({
+          totalSheets,
+          totalFolders: folders.length,
+          totalRecords,
+          totalSuccessRecords,
+          totalErrorRecords,
+          dataQualityScore: qualityScore,
+          lastValidationDate: latestValidation,
+          avgRecordsPerSheet,
+          errorRate,
+          maxRecordsInSheet,
+          avgSheetsPerFolder,
+        });
+        setChartData(aggregatedChartData);
+        setSheetRecordsData(topSheetRecords);
+
+        setLoading(false);
+        return;
+      }
 
       // フォルダ一覧取得
       const foldersRef = collection(db, `users/${userId}/projects/${projectId}/folders`);
@@ -156,10 +314,8 @@ export default function ProjectDashboardContent({ projectId, userId }: ProjectDa
             errorRecords: errorCount,
           });
 
-          if (validatedAt) {
-            const validationDate = validatedAt.toDate
-              ? validatedAt.toDate()
-              : (validatedAt as unknown as Date);
+          const validationDate = toValidDate(validatedAt);
+          if (validationDate) {
             if (!latestValidation || validationDate > latestValidation) {
               latestValidation = validationDate;
             }
@@ -264,7 +420,14 @@ export default function ProjectDashboardContent({ projectId, userId }: ProjectDa
   }, [projectId, userId]);
 
   useEffect(() => {
-    loadDashboardData();
+    void loadDashboardData();
+    if (!isDemoMode()) return;
+
+    // demo: localStorage 更新（バリデーション実行など）を反映
+    const unsub = subscribeDemoState(() => {
+      void loadDashboardData();
+    });
+    return () => unsub();
   }, [loadDashboardData]);
 
   // フィルター適用された日付範囲を計算

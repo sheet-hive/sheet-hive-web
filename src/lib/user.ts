@@ -1,8 +1,10 @@
 import type { User } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
+import { isDemoMode } from "@/lib/appMode";
 
 export async function upsertUser(user: User) {
+  if (isDemoMode()) return;
   if (!user?.uid) return;
   const ref = doc(db, "users", user.uid);
   const payload = {
