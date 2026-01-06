@@ -15,7 +15,6 @@ import {
   buildValidationSpecDocData,
   parseValidationSpecFromDocData,
   sanitizeValidationSpecDocDataForFirestore,
-  type ValidationSpec,
 } from "@shared/mapping";
 import type { SheetMapping } from "@shared/types/mapping";
 

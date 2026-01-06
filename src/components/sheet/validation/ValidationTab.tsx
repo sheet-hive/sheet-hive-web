@@ -136,7 +136,7 @@ function formatDataTypeJa(dataType: DataType | null | undefined): string {
 export default function ValidationTab(props: Props) {
   const { user, projectId, folderId, sheetId, selectedSheet, sheetData, loading, mapping } = props;
 
-  const validationSpecRepo = useMemo(() => createValidationSpecRepo(db), [db]);
+  const validationSpecRepo = useMemo(() => createValidationSpecRepo(db), []);
 
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
@@ -332,7 +332,7 @@ export default function ValidationTab(props: Props) {
     // - mapping.sheetName は過去データで不整合/未設定があり得るため、ここで厳密一致を要求しない。
     // - mapping 自体が無い場合は「ロード中」ではなく「設定不足」として扱う（無限Loading回避）。
     return !loading && isSheetDataReady && isSpecReady;
-  }, [loadedValidationSpecId, loading, loadingValidationSpec, mapping, selectedSheet, sheetData, user]);
+  }, [loadedValidationSpecId, loading, loadingValidationSpec, selectedSheet, sheetData, user]);
 
   useEffect(() => {
     if (!isValidationReady) return;
@@ -534,7 +534,7 @@ export default function ValidationTab(props: Props) {
         headerRow: header,
       });
 
-      const { dataRows, rowObjects } = toRowObjects({
+      const { rowObjects } = toRowObjects({
         sheetValues: sheetData.values,
         dataStartRowIndex,
         runtimeSpec,

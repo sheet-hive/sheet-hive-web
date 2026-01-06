@@ -16,6 +16,9 @@ import KPICard from "@/components/dashboard/KPICard";
 function toValidDate(input: unknown): Date | null {
   if (!input) return null;
 
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
   if (input instanceof Date) {
     return Number.isNaN(input.getTime()) ? null : input;
   }
@@ -26,15 +29,20 @@ function toValidDate(input: unknown): Date | null {
   }
 
   if (typeof input === "object") {
-    const obj = input as any;
+    if (!isRecord(input)) return null;
 
-    if (typeof obj.toDate === "function") {
-      const d = obj.toDate();
+    const toDateCandidate = input.toDate;
+    if (typeof toDateCandidate === "function") {
+      const d = (toDateCandidate as () => unknown)();
       return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
     }
 
-    const seconds = typeof obj.seconds === "number" ? obj.seconds : typeof obj._seconds === "number" ? obj._seconds : null;
-    const nanoseconds = typeof obj.nanoseconds === "number" ? obj.nanoseconds : typeof obj._nanoseconds === "number" ? obj._nanoseconds : 0;
+    const secondsCandidate = input.seconds ?? input._seconds;
+    const nanosecondsCandidate = input.nanoseconds ?? input._nanoseconds;
+
+    const seconds = typeof secondsCandidate === "number" ? secondsCandidate : null;
+    const nanoseconds = typeof nanosecondsCandidate === "number" ? nanosecondsCandidate : 0;
+
     if (seconds !== null) {
       const ms = seconds * 1000 + Math.floor(nanoseconds / 1e6);
       const d = new Date(ms);
@@ -93,9 +101,9 @@ export default function DashboardPage() {
           totalSheets += sheets.length;
 
           for (const sheet of sheets) {
-            const validationTotal = (sheet as any).lastValidationTotalRows;
-            const validationError = (sheet as any).lastValidationErrorRows;
-            const validatedAt = (sheet as any).lastValidatedAt;
+            const validationTotal = sheet.lastValidationTotalRows;
+            const validationError = sheet.lastValidationErrorRows;
+            const validatedAt = sheet.lastValidatedAt;
 
             const hasValidationStats = typeof validationTotal === "number" && typeof validationError === "number";
             if (hasValidationStats) {

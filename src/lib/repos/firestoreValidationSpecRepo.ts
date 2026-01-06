@@ -6,7 +6,6 @@ import {
   buildValidationSpecDocData,
   parseValidationSpecFromDocData,
   sanitizeValidationSpecDocDataForFirestore,
-  type ValidationSpec,
 } from "@shared/mapping";
 
 function sheetDocRef(db: Firestore, key: ValidationSpecRepoKey) {

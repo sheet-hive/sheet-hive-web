@@ -6,15 +6,21 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
-  type User,
+  type Auth,
 } from "firebase/auth";
 import { auth, db } from "../../lib/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { upsertUser } from "../../lib/user";
 import { isDemoMode } from "@/lib/appMode";
 
+type SessionUser = {
+  uid: string;
+  displayName: string | null;
+  email: string | null;
+};
+
 export default function GoogleLoginButton(): JSX.Element {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -23,11 +29,26 @@ export default function GoogleLoginButton(): JSX.Element {
         uid: "demo-user",
         displayName: "Demo User",
         email: "demo@example.com",
-      } as unknown as User);
+      });
       return;
     }
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
+
+    const authOrNull = auth as unknown as Auth | null;
+    if (!authOrNull) {
+      setUser(null);
+      return;
+    }
+
+    const unsub = onAuthStateChanged(authOrNull, async (u) => {
+      setUser(
+        u
+          ? {
+              uid: u.uid,
+              displayName: u.displayName ?? null,
+              email: u.email ?? null,
+            }
+          : null
+      );
       if (u) {
         // Firestore にユーザー情報を保存/更新
         await upsertUser(u);
@@ -41,18 +62,30 @@ export default function GoogleLoginButton(): JSX.Element {
       router.replace("/projects");
       return;
     }
+
+    const authOrNull = auth as unknown as Auth | null;
+    if (!authOrNull) {
+      alert(
+        "Firebase の設定が見つかりません。環境変数（NEXT_PUBLIC_FIREBASE_*）を設定してください。"
+      );
+      return;
+    }
+
     try {
       const provider = new GoogleAuthProvider();
       // スプレッドシート読み取りスコープを付与
       provider.addScope("https://www.googleapis.com/auth/spreadsheets.readonly");
       provider.addScope("https://www.googleapis.com/auth/drive.metadata.readonly");
       
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(authOrNull, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       const accessToken = credential?.accessToken ?? null;
       
       // アクセストークンをFirestoreに保存
       if (accessToken && result.user) {
+        if (!db) {
+          throw new Error("Firestore is not initialized");
+        }
         const tokenRef = doc(db, "users", result.user.uid, "tokens", "google");
         // Googleのアクセストークンは通常1時間で期限切れ
         const expiresAt = new Date(Date.now() + 3600 * 1000);
@@ -81,8 +114,13 @@ export default function GoogleLoginButton(): JSX.Element {
       router.replace("/projects");
       return;
     }
+
+    const authOrNull = auth as unknown as Auth | null;
+    if (!authOrNull) {
+      return;
+    }
     try {
-      await signOut(auth);
+      await signOut(authOrNull);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("Sign-out error:", err);
@@ -96,7 +134,7 @@ export default function GoogleLoginButton(): JSX.Element {
         <div className="flex items-center gap-4">
           <div>
             <div className="font-medium">{user.displayName ?? user.email}</div>
-            <div className="text-sm text-gray-500">{user.email}</div>
+            <div className="text-sm text-gray-500">{user.email ?? ""}</div>
           </div>
           {!isDemoMode() && (
             <button
