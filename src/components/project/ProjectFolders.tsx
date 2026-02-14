@@ -211,7 +211,7 @@ export default function ProjectFolders({ projectId }: { projectId: string }) {
   return (
     <div className="mb-6 p-4 bg-white dark:bg-neutral-900 rounded shadow">
       <h2 className="font-medium mb-2">フォルダ</h2>
-      <form onSubmit={createFolder} className="flex gap-2 mb-3">
+      <form onSubmit={createFolder} className="flex flex-col sm:flex-row gap-2 mb-3">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="新しいフォルダ名" className="flex-1 px-3 py-2 border rounded bg-neutral-50 dark:bg-neutral-800 text-black dark:text-white" />
         <select value={parentId ?? ""} onChange={(e) => setParentId(e.target.value || null)} className="px-2 py-2 border rounded bg-neutral-50 dark:bg-neutral-800 text-black dark:text-white">
           <option value="">ルート</option>

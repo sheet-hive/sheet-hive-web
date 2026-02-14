@@ -57,11 +57,11 @@ export default function ProfilePage() {
     await signOut(auth);
   };
 
-  if (!user) return <div className="p-8">Loading...</div>;
+  if (!user) return <div className="p-4 sm:p-8">Loading...</div>;
 
   return (
-    <main className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-semibold mb-4">Profile</h1>
+    <main className="p-4 sm:p-6 md:p-8 max-w-2xl">
+      <h1 className="text-xl sm:text-2xl font-semibold mb-4">Profile</h1>
       <div className="mb-4">
         <div className="text-sm text-gray-600">Name</div>
         <div className="font-medium">{profile?.displayName ?? user.displayName}</div>

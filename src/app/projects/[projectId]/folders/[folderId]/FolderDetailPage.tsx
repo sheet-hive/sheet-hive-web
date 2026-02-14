@@ -117,7 +117,7 @@ export default function FolderDetailPage({ params }: FolderPageProps) {
           { label: project?.title ?? "プロジェクト", href: `/projects/${projectId}`},
         ]}
       />
-      <main className="flex-1 p-8 text-black dark:text-white">
+      <main className="flex-1 p-3 sm:p-6 md:p-8 text-black dark:text-white">
         <div className="max-w-3xl mx-auto">
           <Breadcrumb
             items={[

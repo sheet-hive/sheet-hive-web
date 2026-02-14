@@ -72,7 +72,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           { label: "プロジェクト編集", href: `/projects/${projectId}/edit`},
         ]}
       />
-      <main className="flex-1 p-8 text-black dark:text-white">
+      <main className="flex-1 p-3 sm:p-6 md:p-8 text-black dark:text-white">
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <Title text={project?.title ?? ""} />

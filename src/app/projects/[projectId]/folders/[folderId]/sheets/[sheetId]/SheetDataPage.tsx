@@ -228,7 +228,7 @@ export default function SheetDataPage({ params }: PageProps) {
       />
       <div className="flex flex-1">
         <Sidebar menuItems={[]} />
-        <main className="flex-1 p-6 min-w-0">
+        <main className="flex-1 p-2 sm:p-4 md:p-6 min-w-0">
           <div className="mb-6">
             <Breadcrumb
               items={[
@@ -298,7 +298,7 @@ export default function SheetDataPage({ params }: PageProps) {
               </button>
             </div>
 
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
               <label htmlFor="sheetSelect" className="text-sm">シート:</label>
               <select
                 id="sheetSelect"

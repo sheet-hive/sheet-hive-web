@@ -165,7 +165,7 @@ export default function ProjectMembers({ projectId }: { projectId: string }) {
         {!loading && !canManage() && (
           <div className="text-sm text-yellow-400 mb-2">あなたはメンバー管理の権限を持っていません（閲覧のみ）</div>
         )}
-        <form onSubmit={invite} className="flex gap-2">
+        <form onSubmit={invite} className="flex flex-col sm:flex-row gap-2">
           <input value={inviteInput} onChange={(e) => setInviteInput(e.target.value)} placeholder="メールアドレスまたはUIDを入力" className="flex-1 px-3 py-2 border rounded bg-neutral-50 dark:bg-neutral-800 text-black dark:text-white" />
           <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="px-2 py-2 border rounded bg-neutral-50 dark:bg-neutral-800 text-black dark:text-white">
             <option value="member">member</option>

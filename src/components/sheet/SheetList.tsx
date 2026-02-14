@@ -278,7 +278,7 @@ export default function SheetList({ user, sheets, loading, projectId, folderId }
   };
 
   return (
-    <div className="max-w-2xl p-6 bg-white dark:bg-neutral-900 text-black dark:text-white rounded shadow-lg">
+    <div className="max-w-2xl p-4 sm:p-6 bg-white dark:bg-neutral-900 text-black dark:text-white rounded shadow-lg">
       <ConfirmDialog
         open={confirmDeleteOpen}
         title="削除確認"
@@ -297,8 +297,8 @@ export default function SheetList({ user, sheets, loading, projectId, folderId }
           await removeSheet(id);
         }}
       />
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => toggleSort("title")}
             className={`px-3 py-1 text-sm rounded ${
@@ -320,7 +320,7 @@ export default function SheetList({ user, sheets, loading, projectId, folderId }
             追加日 {sortKey === "addedAt" && (sortAsc ? "↑" : "↓")}
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setViewMode("list")}
             className={`px-3 py-1 text-sm rounded ${
@@ -418,7 +418,7 @@ export default function SheetList({ user, sheets, loading, projectId, folderId }
             ))}
           </ul>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {sortedSheets.map((s) => (
               <div key={s.id} className="border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 p-4 rounded flex flex-col">
                 {/* 接続状態バッジ */}

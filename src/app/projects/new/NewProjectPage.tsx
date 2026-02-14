@@ -87,11 +87,11 @@ export default function NewProjectPage() {
           { label: "プロジェクト一覧", href: "/projects"},
         ]}
       />
-      <main className="flex-1 p-8 text-black dark:text-white">
+      <main className="flex-1 p-3 sm:p-6 md:p-8 text-black dark:text-white">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-semibold mb-6">新規プロジェクト作成</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold mb-6">新規プロジェクト作成</h1>
 
-          <section className="p-6 bg-white dark:bg-neutral-900 rounded shadow">
+          <section className="p-4 sm:p-6 bg-white dark:bg-neutral-900 rounded shadow">
             <form onSubmit={createProject} className="space-y-4">
               <div>
                 <label htmlFor="title" className="block text-sm font-medium mb-1">

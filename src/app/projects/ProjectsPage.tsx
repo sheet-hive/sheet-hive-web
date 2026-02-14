@@ -68,7 +68,7 @@ export default function ProjectsPage() {
           { label: "プロジェクトの追加", href: "/projects/new"},
         ]}
       />
-      <main className="flex-1 p-8 text-black dark:text-white">
+      <main className="flex-1 p-3 sm:p-6 md:p-8 text-black dark:text-white">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-semibold">Projects</h1>

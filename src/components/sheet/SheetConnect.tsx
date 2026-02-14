@@ -114,9 +114,9 @@ export default function SheetConnect({ projectId, folderId, onSheetAdded }: Shee
   };
 
   return (
-    <div className="max-w-2xl p-6 bg-white dark:bg-neutral-900 text-black dark:text-white rounded shadow-lg">
-      <h2 className="text-xl font-semibold mb-4">シートを追加</h2>
-      <form onSubmit={addSheet} className="flex gap-2">
+    <div className="max-w-2xl p-4 sm:p-6 bg-white dark:bg-neutral-900 text-black dark:text-white rounded shadow-lg">
+      <h2 className="text-lg sm:text-xl font-semibold mb-4">シートを追加</h2>
+      <form onSubmit={addSheet} className="flex flex-col sm:flex-row gap-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}

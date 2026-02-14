@@ -99,14 +99,14 @@ export default function SheetMappingEditor({
       />
 
       {/* ヘッダー */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">マッピング設定</h2>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+          <h2 className="text-lg sm:text-xl font-bold">マッピング設定</h2>
+          <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1">
             シートのカラム名・フィールド名・データ型（推定/指定）を設定します
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3">
           <button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
@@ -166,8 +166,8 @@ export default function SheetMappingEditor({
       </div>
 
       {/* マッピング一覧 */}
-      <div className="border border-neutral-300 dark:border-neutral-600 rounded-lg overflow-hidden">
-        <table className="w-full">
+      <div className="border border-neutral-300 dark:border-neutral-600 rounded-lg overflow-x-auto">
+        <table className="w-full min-w-max">{/* prevent wrapping on small screens */}
           <thead className="bg-neutral-100 dark:bg-neutral-800">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-semibold w-12">列</th>
@@ -240,7 +240,7 @@ export default function SheetMappingEditor({
       </div>
 
       {/* 統計情報 */}
-      <div className="grid grid-cols-3 gap-4 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
         <div>
           <div className="text-sm text-neutral-600 dark:text-neutral-400">マッピング数</div>
           <div className="text-2xl font-bold">{mapping.fields.length}</div>
